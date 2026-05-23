@@ -12,8 +12,16 @@ const MockPaymentService = require('./services/mockPaymentService');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// CORS configuration
+const corsOptions = {
+    origin: ['http://localhost:3000', 'https://ver-camp.vercel.app', 'https://*.vercel.app', 'https://*.onrender.com'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Health check endpoint
@@ -27,7 +35,7 @@ app.get('/health', (req, res) => {
 
 // ==================== MOCK PAYMENT ENDPOINTS ====================
 
-// Mock Payment Endpoints (MUST be before GraphQL)
+// Mock Payment Endpoints
 app.post('/api/payment/initiate', express.json(), async (req, res) => {
     const { orderId, amount, email, firstName, lastName } = req.body;
     
@@ -58,23 +66,26 @@ app.get('/api/payment/callback', (req, res) => {
     console.log(`📞 Payment Callback: ${tx_ref} - ${status}`);
     
     // Redirect to frontend success page
-    res.redirect(`http://localhost:3000/payment/success?tx_ref=${tx_ref}&status=${status}&order_id=${order_id}`);
+    res.redirect(`https://ver-camp.vercel.app/payment/success?tx_ref=${tx_ref}&status=${status}&order_id=${order_id}`);
 });
 
 // ==================== GRAPHQL SETUP ====================
 
-// Create Apollo Server
+// Create Apollo Server with detailed errors
 const server = new ApolloServer({
     typeDefs,
     resolvers,
     introspection: true,
     formatError: (err) => {
-        console.error('GraphQL Error:', err.message);
+        console.error('GraphQL Error:', err);
+        // Return full error details for debugging
         return {
             message: err.message,
-            code: err.extensions?.code || 'INTERNAL_SERVER_ERROR'
+            code: err.extensions?.code || 'INTERNAL_SERVER_ERROR',
+            path: err.path,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         };
-    }
+    },
 });
 
 // Start server function
@@ -83,7 +94,7 @@ async function startServer() {
 
     app.use(
         '/graphql',
-        cors(),
+        cors(corsOptions),
         express.json(),
         expressMiddleware(server, {
             context: async ({ req }) => {
@@ -94,7 +105,7 @@ async function startServer() {
         })
     );
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`\n${'='.repeat(50)}`);
         console.log(`🍕 Campus Crave GraphQL API`);
         console.log(`${'='.repeat(50)}`);
