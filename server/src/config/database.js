@@ -1,14 +1,18 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+
+// Use DATABASE_URL from environment variables
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+    console.error('❌ DATABASE_URL environment variable is not set!');
+    process.exit(1);
+}
 
 const pool = new Pool({
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'campus_crave',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    max: 20,
-    idleTimeoutMillis: 30000,
+    connectionString: connectionString,
+    ssl: {
+        rejectUnauthorized: false  // Required for Render PostgreSQL
+    }
 });
 
 pool.on('connect', () => {
@@ -16,7 +20,7 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-    console.error('❌ Unexpected database error:', err);
+    console.error('❌ Database error:', err);
 });
 
 module.exports = pool;
