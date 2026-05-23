@@ -1,13 +1,13 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 
-// Your computer's IP address (from running `hostname -I`)
-// Make sure your phone is on the same WiFi network
-const IP_ADDRESS = '192.168.1.15';
+// Your deployed backend URL on Render
+// Replace with your actual Render URL
+const BACKEND_URL = 'https://campus-crave-2xzl.onrender.com';
 
 // Create HTTP link to your backend
 const httpLink = createHttpLink({
-    uri: `http://${IP_ADDRESS}:4000/graphql`,
+    uri: `${BACKEND_URL}/graphql`,
 });
 
 // Add authentication token to requests
