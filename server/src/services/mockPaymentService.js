@@ -2,7 +2,7 @@
 class MockPaymentService {
     // Generate transaction reference
     static generateTxRef(orderId) {
-        return `MOCK-${orderId}-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`;
+        return `MOCK-${orderId}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     }
 
     // Initialize mock payment
@@ -10,11 +10,10 @@ class MockPaymentService {
         // Simulate network delay
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        console.log(`\n🎭 Mock Payment Initiated:`);
-        console.log(`   Order ID: ${orderId}`);
+        console.log(`🎭 Mock Payment Initiated:`);
+        console.log(`   Order: ${orderId}`);
         console.log(`   Amount: ETB ${amount}`);
         console.log(`   Email: ${email}`);
-        console.log(`   Customer: ${firstName} ${lastName}`);
         console.log(`   Reference: ${txRef}`);
         
         // Always return success for demo
@@ -30,7 +29,7 @@ class MockPaymentService {
     static async verifyPayment(txRef) {
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        console.log(`\n🎭 Mock Payment Verified: ${txRef}`);
+        console.log(`🎭 Mock Payment Verified: ${txRef}`);
         
         return {
             success: true,
@@ -45,14 +44,14 @@ class MockPaymentService {
     static async refundPayment(txRef, amount, reason) {
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        console.log(`\n🎭 Mock Refund Processed:`);
+        console.log(`🎭 Mock Refund Processed:`);
         console.log(`   Transaction: ${txRef}`);
         console.log(`   Amount: ETB ${amount}`);
         console.log(`   Reason: ${reason}`);
         
         return {
             success: true,
-            refundId: `REF-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+            refundId: `REF-${Date.now()}`,
             message: 'Mock refund successful'
         };
     }

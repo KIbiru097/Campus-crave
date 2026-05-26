@@ -12,9 +12,9 @@ const MockPaymentService = require('./services/mockPaymentService');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// CORS configuration
+// CORS configuration - LOCAL ONLY
 const corsOptions = {
-    origin: ['http://localhost:3000', 'https://ver-camp.vercel.app', 'https://*.vercel.app', 'https://*.onrender.com'],
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -28,7 +28,7 @@ app.use(express.json());
 app.get('/health', (req, res) => {
     res.json({
         status: 'OK',
-        app: process.env.APP_NAME || 'Campus Crave API',
+        app: 'Campus Crave API',
         timestamp: new Date().toISOString()
     });
 });
@@ -60,30 +60,27 @@ app.post('/api/payment/refund', express.json(), async (req, res) => {
     res.json(result);
 });
 
-// Payment callback endpoint
+// Payment callback endpoint - LOCAL ONLY
 app.get('/api/payment/callback', (req, res) => {
     const { tx_ref, status, order_id } = req.query;
     console.log(`📞 Payment Callback: ${tx_ref} - ${status}`);
     
-    // Redirect to frontend success page
-    res.redirect(`https://ver-camp.vercel.app/payment/success?tx_ref=${tx_ref}&status=${status}&order_id=${order_id}`);
+    // Redirect to local frontend
+    res.redirect(`http://localhost:3000/payment/success?tx_ref=${tx_ref}&status=${status}&order_id=${order_id}`);
 });
 
 // ==================== GRAPHQL SETUP ====================
 
-// Create Apollo Server with detailed errors
+// Create Apollo Server
 const server = new ApolloServer({
     typeDefs,
     resolvers,
     introspection: true,
     formatError: (err) => {
-        console.error('GraphQL Error:', err);
-        // Return full error details for debugging
+        console.error('GraphQL Error:', err.message);
         return {
             message: err.message,
-            code: err.extensions?.code || 'INTERNAL_SERVER_ERROR',
-            path: err.path,
-            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+            code: err.extensions?.code || 'INTERNAL_SERVER_ERROR'
         };
     },
 });
@@ -105,13 +102,14 @@ async function startServer() {
         })
     );
 
-    app.listen(PORT, '0.0.0.0', () => {
+    app.listen(PORT, () => {
         console.log(`\n${'='.repeat(50)}`);
-        console.log(`🍕 Campus Crave GraphQL API`);
+        console.log(`🍕 Campus Crave GraphQL API (LOCAL MODE)`);
         console.log(`${'='.repeat(50)}`);
         console.log(`📍 GraphQL: http://localhost:${PORT}/graphql`);
         console.log(`💚 Health:  http://localhost:${PORT}/health`);
         console.log(`🔧 Mock Payment: http://localhost:${PORT}/api/payment/initiate`);
+        console.log(`🔗 Frontend should be on: http://localhost:3000`);
         console.log(`${'='.repeat(50)}\n`);
     });
 }

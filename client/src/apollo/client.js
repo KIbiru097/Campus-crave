@@ -1,16 +1,10 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 
-// Your deployed backend URL on Render
-// Replace with your actual Render URL
-const BACKEND_URL = 'https://campus-crave-2xzl.onrender.com';
-
-// Create HTTP link to your backend
 const httpLink = createHttpLink({
-    uri: `${BACKEND_URL}/graphql`,
+    uri: 'http://localhost:4000/graphql',
 });
 
-// Add authentication token to requests
 const authLink = setContext((_, { headers }) => {
     const token = localStorage.getItem('token');
     return {
@@ -21,7 +15,6 @@ const authLink = setContext((_, { headers }) => {
     };
 });
 
-// Create Apollo Client instance
 const client = new ApolloClient({
     link: authLink.concat(httpLink),
     cache: new InMemoryCache(),

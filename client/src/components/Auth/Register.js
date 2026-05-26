@@ -13,8 +13,11 @@ const Register = () => {
         phone: '',
         reg_no: '',
         institution: '',
-        department: ''
+        department: '',
+        year_of_study: ''
     });
+    const [idImage, setIdImage] = useState(null);
+    const [idImagePreview, setIdImagePreview] = useState(null);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
@@ -29,15 +32,45 @@ const Register = () => {
         });
     };
 
+    const handleImageCapture = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setFormData({
+                ...formData,
+                id_image_base64: file
+            });
+            setIdImage(file);
+            setIdImagePreview(URL.createObjectURL(file));
+        }
+    };
+
+    const convertToBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (error) => reject(error);
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
         try {
+            let imageBase64 = null;
+            if (idImage) {
+                imageBase64 = await convertToBase64(idImage);
+            }
+
             const { data } = await registerMutation({
                 variables: {
-                    input: formData
+                    input: {
+                        ...formData,
+                        id_image_base64: imageBase64,
+                        year_of_study: parseInt(formData.year_of_study) || null
+                    }
                 }
             });
 
@@ -123,14 +156,46 @@ const Register = () => {
                         style={styles.input}
                         required
                     />
-                    <input
-                        type="text"
-                        name="department"
-                        placeholder="Department"
-                        value={formData.department}
-                        onChange={handleChange}
-                        style={styles.input}
-                    />
+                    <div style={styles.row}>
+                        <input
+                            type="text"
+                            name="department"
+                            placeholder="Department"
+                            value={formData.department}
+                            onChange={handleChange}
+                            style={styles.inputHalf}
+                        />
+                        <input
+                            type="number"
+                            name="year_of_study"
+                            placeholder="Year of Study"
+                            value={formData.year_of_study}
+                            onChange={handleChange}
+                            style={styles.inputHalf}
+                        />
+                    </div>
+                    
+                    {/* OCR Image Upload Section */}
+                    <div style={styles.imageSection}>
+                        <label style={styles.imageLabel}>Student ID Card (for verification)</label>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleImageCapture}
+                            style={styles.fileInput}
+                        />
+                        {idImagePreview && (
+                            <div style={styles.previewContainer}>
+                                <img src={idImagePreview} alt="ID Preview" style={styles.previewImage} />
+                                <p style={styles.previewText}>ID Card uploaded successfully</p>
+                            </div>
+                        )}
+                        <p style={styles.noteText}>
+                            Please upload a clear photo of your student ID card for verification
+                        </p>
+                    </div>
+                    
                     {error && <div style={styles.error}>{error}</div>}
                     <button type="submit" disabled={loading} style={styles.button}>
                         {loading ? 'Creating Account...' : 'Register'}
@@ -186,6 +251,45 @@ const styles = {
         borderRadius: '5px',
         fontSize: '14px',
         boxSizing: 'border-box',
+    },
+    imageSection: {
+        margin: '15px 0',
+        padding: '15px',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '8px',
+    },
+    imageLabel: {
+        display: 'block',
+        marginBottom: '10px',
+        fontWeight: 'bold',
+        color: '#2c3e50',
+    },
+    fileInput: {
+        width: '100%',
+        padding: '10px',
+        border: '1px solid #ddd',
+        borderRadius: '5px',
+        backgroundColor: 'white',
+    },
+    previewContainer: {
+        marginTop: '10px',
+        textAlign: 'center',
+    },
+    previewImage: {
+        maxWidth: '100%',
+        maxHeight: '150px',
+        borderRadius: '8px',
+    },
+    previewText: {
+        marginTop: '5px',
+        fontSize: '12px',
+        color: '#27ae60',
+    },
+    noteText: {
+        marginTop: '10px',
+        fontSize: '11px',
+        color: '#888',
+        textAlign: 'center',
     },
     button: {
         width: '100%',

@@ -23,6 +23,9 @@ const typeDefs = gql`
         year_of_study: Int
         phone_number: String
         verification_status: String!
+        is_verified: Boolean!
+        verification_date: String
+        id_photo_path: String
         verified_at: String
         created_at: String!
         user: User
@@ -145,6 +148,7 @@ const typeDefs = gql`
         student_id: Int!
         image_path: String
         extracted_data: String
+        extracted_name: String
         confidence_score: Float
         status: String!
         error_message: String
@@ -155,6 +159,18 @@ const typeDefs = gql`
     type AuthPayload {
         token: String!
         user: User!
+    }
+
+    type PaymentResult {
+        success: Boolean!
+        message: String!
+    }
+
+    type OCRResult {
+        success: Boolean!
+        extracted_name: String
+        confidence: Float
+        message: String
     }
 
     # ============== INPUT TYPES ==============
@@ -169,6 +185,7 @@ const typeDefs = gql`
         institution: String!
         department: String
         year_of_study: Int
+        id_image_base64: String  # NEW: Base64 encoded image for OCR
     }
 
     input LoginInput {
@@ -213,7 +230,7 @@ const typeDefs = gql`
 
     input CreateOrderInput {
         cafe_id: Int!
-        payment_type: String!
+        payment_type: String!  # 'ONLINE' or 'COD'
         special_instructions: String
         delivery_address: String
     }
@@ -273,6 +290,9 @@ const typeDefs = gql`
         register(input: RegisterInput!): AuthPayload!
         login(input: LoginInput!): AuthPayload!
         
+        # OCR Verification
+        verifyStudentWithOCR(id_image_base64: String!, full_name: String!): OCRResult!
+        
         # Cafe mutations (CRUD)
         createCafe(input: CreateCafeInput!): Cafe!
         updateCafe(id: ID!, input: UpdateCafeInput!): Cafe!
@@ -295,12 +315,12 @@ const typeDefs = gql`
         updateOrderStatus(input: UpdateOrderStatusInput!): Order!
         cancelOrder(order_id: ID!): Order!
         
+        # Payment mutations
+        verifyPayment(orderId: ID!, paymentPassword: String!): PaymentResult!
+        
         # Delivery mutations
         assignDelivery(order_id: ID!, delivery_person_id: ID!): Delivery!
         updateDeliveryStatus(delivery_id: ID!, status: String!): Delivery!
-        
-        # OCR verification
-        verifyStudentWithOCR(student_id: ID!, id_image_base64: String!): Student!
     }
 `;
 

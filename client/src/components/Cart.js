@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Link, useNavigate } from 'react-router-dom';
 import { GET_CART } from '../graphql/queries';
 import { UPDATE_CART_ITEM, REMOVE_FROM_CART, CLEAR_CART, CREATE_ORDER } from '../graphql/mutations';
 
-// Your computer's IP address for mobile access
-const IP_ADDRESS = '192.168.1.15';
-
 const Cart = () => {
     const navigate = useNavigate();
+    const [paymentMethod, setPaymentMethod] = useState('COD');
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentPassword, setPaymentPassword] = useState('');
+    const [currentOrder, setCurrentOrder] = useState(null);
+    const [paymentError, setPaymentError] = useState('');
+    
     const { loading, error, data, refetch } = useQuery(GET_CART);
     const [updateCartItem] = useMutation(UPDATE_CART_ITEM);
     const [removeFromCart] = useMutation(REMOVE_FROM_CART);
@@ -25,7 +28,6 @@ const Cart = () => {
             });
             refetch();
         } catch (err) {
-            console.error('Error updating quantity:', err);
             alert('Failed to update quantity');
         }
     };
@@ -37,7 +39,6 @@ const Cart = () => {
             });
             refetch();
         } catch (err) {
-            console.error('Error removing item:', err);
             alert('Failed to remove item');
         }
     };
@@ -48,7 +49,6 @@ const Cart = () => {
                 await clearCart();
                 refetch();
             } catch (err) {
-                console.error('Error clearing cart:', err);
                 alert('Failed to clear cart');
             }
         }
@@ -62,15 +62,21 @@ const Cart = () => {
             return;
         }
 
-        // Get cafe ID from first item (or default to 1)
         const cafeId = cart.items[0]?.menu_item?.cafe_id || 1;
+        
+        // Check if total is over 1500 and force online payment
+        if (cart.total > 1500 && paymentMethod === 'COD') {
+            alert('Orders over 1500 ETB must pay online');
+            setPaymentMethod('ONLINE');
+            return;
+        }
 
         try {
             const { data: orderData } = await createOrder({
                 variables: {
                     input: {
                         cafe_id: cafeId,
-                        payment_type: 'Online',
+                        payment_type: paymentMethod,
                         special_instructions: null
                     }
                 }
@@ -78,12 +84,65 @@ const Cart = () => {
             
             if (orderData?.createOrder) {
                 const order = orderData.createOrder;
-                // Redirect to mock payment with the IP address
-                window.location.href = `http://${IP_ADDRESS}:3000/mock-payment?tx_ref=MOCK-${order.id}-${Date.now()}&amount=${cart.total}&order_id=${order.id}`;
+                
+                if (paymentMethod === 'COD') {
+                    // Cash on Delivery - direct success
+                    alert(`Order placed successfully! Order #: ${order.order_number}`);
+                    refetch();
+                    navigate('/orders');
+                } else {
+                    // Online payment - show password modal
+                    setCurrentOrder(order);
+                    setShowPaymentModal(true);
+                }
             }
         } catch (err) {
-            console.error('Checkout error:', err);
             alert('Failed to create order: ' + err.message);
+        }
+    };
+
+    const handlePaymentVerification = async () => {
+        if (!paymentPassword) {
+            setPaymentError('Please enter your payment password');
+            return;
+        }
+        
+        try {
+            // Call your payment verification API
+            const response = await fetch('http://localhost:4000/graphql', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    query: `
+                        mutation VerifyPayment($orderId: ID!, $paymentPassword: String!) {
+                            verifyPayment(orderId: $orderId, paymentPassword: $paymentPassword) {
+                                success
+                                message
+                            }
+                        }
+                    `,
+                    variables: {
+                        orderId: currentOrder.id,
+                        paymentPassword: paymentPassword
+                    }
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.data?.verifyPayment?.success) {
+                alert('Payment successful! Order confirmed.');
+                setShowPaymentModal(false);
+                setPaymentPassword('');
+                window.location.href = '/orders';
+            } else {
+                setPaymentError(result.data?.verifyPayment?.message || 'Payment failed');
+            }
+        } catch (err) {
+            setPaymentError('Payment verification failed');
         }
     };
 
@@ -109,6 +168,38 @@ const Cart = () => {
     return (
         <div style={styles.container}>
             <h2 style={styles.title}>Shopping Cart</h2>
+            
+            {/* Payment Method Selection */}
+            <div style={styles.paymentSection}>
+                <h3>Payment Method</h3>
+                <div style={styles.paymentOptions}>
+                    <label style={styles.paymentOption}>
+                        <input
+                            type="radio"
+                            value="COD"
+                            checked={paymentMethod === 'COD'}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            disabled={total > 1500}
+                        />
+                        <span>Cash on Delivery (COD)</span>
+                    </label>
+                    <label style={styles.paymentOption}>
+                        <input
+                            type="radio"
+                            value="ONLINE"
+                            checked={paymentMethod === 'ONLINE'}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                        />
+                        <span>Pay Online</span>
+                    </label>
+                </div>
+                {total > 1500 && (
+                    <p style={styles.warningMessage}>
+                        ⚠️ Orders over 1500 ETB must pay online
+                    </p>
+                )}
+            </div>
+            
             <div style={styles.itemsContainer}>
                 {items.map((item) => (
                     <div key={item.id} style={styles.cartItem}>
@@ -154,6 +245,33 @@ const Cart = () => {
                     </button>
                 </div>
             </div>
+            
+            {/* Payment Password Modal */}
+            {showPaymentModal && (
+                <div style={styles.modal}>
+                    <div style={styles.modalContent}>
+                        <h3>Enter Payment Password</h3>
+                        <p>Order Total: ETB {currentOrder?.total_amount}</p>
+                        <input
+                            type="password"
+                            placeholder="Enter your payment password"
+                            value={paymentPassword}
+                            onChange={(e) => setPaymentPassword(e.target.value)}
+                            style={styles.modalInput}
+                        />
+                        {paymentError && <p style={styles.errorText}>{paymentError}</p>}
+                        <div style={styles.modalButtons}>
+                            <button onClick={() => setShowPaymentModal(false)} style={styles.cancelBtn}>
+                                Cancel
+                            </button>
+                            <button onClick={handlePaymentVerification} style={styles.confirmBtn}>
+                                Pay Now
+                            </button>
+                        </div>
+                        <p style={styles.modalHint}>Default password: 123456</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -167,6 +285,28 @@ const styles = {
     title: {
         marginBottom: '20px',
         color: '#2c3e50',
+    },
+    paymentSection: {
+        backgroundColor: '#f8f9fa',
+        padding: '15px',
+        borderRadius: '10px',
+        marginBottom: '20px',
+    },
+    paymentOptions: {
+        display: 'flex',
+        gap: '20px',
+        marginTop: '10px',
+    },
+    paymentOption: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        cursor: 'pointer',
+    },
+    warningMessage: {
+        color: '#e74c3c',
+        fontSize: '14px',
+        marginTop: '10px',
     },
     itemsContainer: {
         border: '1px solid #ddd',
@@ -264,6 +404,64 @@ const styles = {
     emptyContainer: {
         textAlign: 'center',
         padding: '60px',
+    },
+    modal: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        padding: '30px',
+        borderRadius: '10px',
+        width: '90%',
+        maxWidth: '400px',
+        textAlign: 'center',
+    },
+    modalInput: {
+        width: '100%',
+        padding: '10px',
+        margin: '15px 0',
+        border: '1px solid #ddd',
+        borderRadius: '5px',
+        fontSize: '16px',
+    },
+    modalButtons: {
+        display: 'flex',
+        gap: '10px',
+        justifyContent: 'center',
+    },
+    cancelBtn: {
+        padding: '10px 20px',
+        backgroundColor: '#95a5a6',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+    },
+    confirmBtn: {
+        padding: '10px 20px',
+        backgroundColor: '#27ae60',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+    },
+    errorText: {
+        color: '#e74c3c',
+        marginBottom: '10px',
+    },
+    modalHint: {
+        marginTop: '15px',
+        fontSize: '12px',
+        color: '#888',
     },
 };
 
