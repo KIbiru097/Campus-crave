@@ -109,7 +109,8 @@ const Cart = () => {
         
         try {
             // Call your payment verification API
-            const response = await fetch('http://localhost:4000/graphql', {
+           const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+            const response = await fetch(`${BACKEND_URL}/graphql`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

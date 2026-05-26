@@ -1,3 +1,4 @@
+const BACKEND_URL = process.env.REACT_APP_API_URL || "${BACKEND_URL}";
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -20,7 +21,7 @@ const MockPayment = () => {
         
         setTimeout(async () => {
             try {
-                const response = await fetch(`http://localhost:4000/api/payment/verify/${txRef}`);
+                const response = await fetch(`${BACKEND_URL}/api/payment/verify/${txRef}`);
                 const result = await response.json();
                 
                 if (result.success) {
