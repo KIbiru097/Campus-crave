@@ -1,15 +1,21 @@
 const { Pool } = require('pg');
 
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+    console.error('❌ DATABASE_URL environment variable is not set!');
+    process.exit(1);
+}
+
 const pool = new Pool({
-    user: 'kibru',
-    password: '1234',
-    host: 'localhost',
-    port: 5432,
-    database: 'cumpas_crave'
+    connectionString: connectionString,
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 pool.on('connect', () => {
-    console.log('✅ Connected to LOCAL PostgreSQL database');
+    console.log('✅ Connected to PostgreSQL database');
 });
 
 pool.on('error', (err) => {
