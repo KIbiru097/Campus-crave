@@ -1,7 +1,8 @@
-const BACKEND_URL = process.env.REACT_APP_API_URL || "${BACKEND_URL}";
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
 const MockPayment = () => {
     const [searchParams] = useSearchParams();
@@ -52,8 +53,6 @@ const MockPayment = () => {
             setTimeout(() => handleMockPayment(), 1000);
         }
     }, [txRef, amount, handleMockPayment]);
-
-    // ... rest of your component (the JSX part)
 
     if (showSuccess) {
         return (

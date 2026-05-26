@@ -1,7 +1,6 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 
-// Use environment variable or default to localhost for development
 const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
 const httpLink = createHttpLink({
@@ -17,7 +16,7 @@ const authLink = setContext((_, { headers }) => {
         }
     };
 });
-c
+
 const client = new ApolloClient({
     link: authLink.concat(httpLink),
     cache: new InMemoryCache(),
