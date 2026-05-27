@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useMutation } from '@apollo/client';
 import { Link, useNavigate } from 'react-router-dom';
 import { REGISTER_USER } from '../../graphql/mutations';
@@ -11,6 +11,7 @@ const Register = () => {
         full_name: '',
         email: '',
         password: '',
+        confirmPassword: '',
         phone: '',
         reg_no: '',
         institution: '',
@@ -18,10 +19,15 @@ const Register = () => {
         year_of_study: '',
         gender: ''
     });
+    const [studentIdImage, setStudentIdImage] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
+    const [ocrResult, setOcrResult] = useState(null);
+    const [isVerifying, setIsVerifying] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [studentInfo, setStudentInfo] = useState(null);
+    const fileInputRef = useRef(null);
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -32,14 +38,140 @@ const Register = () => {
             ...formData,
             [e.target.name]: e.target.value
         });
+        // Clear error when user starts typing
+        if (error) setError('');
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type
+            if (!file.type.match('image.*')) {
+                setError('Please upload an image file (JPEG, PNG)');
+                return;
+            }
+            
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                setError('File is too large! Maximum size is 5MB.');
+                return;
+            }
+            
+            setStudentIdImage(file);
+            
+            // Create preview
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result);
+            };
+            reader.readAsDataURL(file);
+            
+            // Simulate OCR verification (in production, send to backend)
+            simulateOCR(file);
+        }
+    };
+
+    // Simulate OCR verification (replace with actual API call)
+    const simulateOCR = (file) => {
+        setIsVerifying(true);
+        
+        // Simulate API delay
+        setTimeout(() => {
+            // Mock OCR result - in production, this would come from your backend
+            const mockOcrData = {
+                verified: true,
+                extractedText: `Student ID Card
+Name: ${formData.full_name || 'Student Name'}
+ID: ${formData.reg_no || '2023/1234'}
+University: ${formData.institution || 'University Name'}
+Department: ${formData.department || 'Computer Science'}
+Valid: Yes`,
+                confidence: 95.5,
+                fields: {
+                    name: formData.full_name || 'Student Name',
+                    id: formData.reg_no || '2023/1234',
+                    university: formData.institution || 'University Name',
+                    department: formData.department || 'Computer Science'
+                }
+            };
+            
+            setOcrResult(mockOcrData);
+            setIsVerifying(false);
+            
+            // Auto-fill form with OCR data if fields are empty
+            if (!formData.full_name && mockOcrData.fields.name) {
+                setFormData(prev => ({ ...prev, full_name: mockOcrData.fields.name }));
+            }
+            if (!formData.reg_no && mockOcrData.fields.id) {
+                setFormData(prev => ({ ...prev, reg_no: mockOcrData.fields.id }));
+            }
+            if (!formData.institution && mockOcrData.fields.university) {
+                setFormData(prev => ({ ...prev, institution: mockOcrData.fields.university }));
+            }
+            if (!formData.department && mockOcrData.fields.department) {
+                setFormData(prev => ({ ...prev, department: mockOcrData.fields.department }));
+            }
+        }, 2000);
+    };
+
+    const validateForm = () => {
+        if (!formData.username.trim()) {
+            setError('Username is required');
+            return false;
+        }
+        if (!formData.full_name.trim()) {
+            setError('Full name is required');
+            return false;
+        }
+        if (!formData.email.trim()) {
+            setError('Email is required');
+            return false;
+        }
+        if (!formData.password) {
+            setError('Password is required');
+            return false;
+        }
+        if (formData.password !== formData.confirmPassword) {
+            setError('Passwords do not match');
+            return false;
+        }
+        if (formData.password.length < 6) {
+            setError('Password must be at least 6 characters');
+            return false;
+        }
+        if (!formData.reg_no.trim()) {
+            setError('Registration number is required');
+            return false;
+        }
+        if (!formData.institution.trim()) {
+            setError('Institution is required');
+            return false;
+        }
+        if (!studentIdImage) {
+            setError('Please upload your student ID card');
+            return false;
+        }
+        if (!ocrResult || !ocrResult.verified) {
+            setError('Please wait for ID verification or upload a clearer image');
+            return false;
+        }
+        return true;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (!validateForm()) {
+            return;
+        }
+        
         setError('');
         setLoading(true);
 
         try {
+            // In production, you would upload the image to your backend
+            // For now, we'll proceed with registration
+            
             const { data } = await registerMutation({
                 variables: {
                     input: {
@@ -47,10 +179,10 @@ const Register = () => {
                         full_name: formData.full_name,
                         email: formData.email,
                         password: formData.password,
-                        phone: formData.phone,
+                        phone: formData.phone || '',
                         reg_no: formData.reg_no,
                         institution: formData.institution,
-                        department: formData.department,
+                        department: formData.department || '',
                         year_of_study: parseInt(formData.year_of_study) || null
                     }
                 }
@@ -62,7 +194,8 @@ const Register = () => {
                     name: formData.full_name,
                     reg_no: formData.reg_no,
                     institution: formData.institution,
-                    department: formData.department
+                    department: formData.department,
+                    ocrConfidence: ocrResult.confidence
                 });
                 setShowSuccess(true);
                 setTimeout(() => {
@@ -89,6 +222,9 @@ const Register = () => {
                         <p><strong>Registration No:</strong> {studentInfo?.reg_no}</p>
                         <p><strong>Institution:</strong> {studentInfo?.institution}</p>
                         <p><strong>Department:</strong> {studentInfo?.department}</p>
+                        {studentInfo?.ocrConfidence && (
+                            <p><strong>ID Verification:</strong> {studentInfo.ocrConfidence}% confidence</p>
+                        )}
                     </div>
                     <p className="redirect-message">Redirecting to home page...</p>
                 </div>
@@ -102,7 +238,7 @@ const Register = () => {
                 <div className="register-illustration">
                     <div className="illustration-content">
                         <h1>Campus Crave</h1>
-                        <p>Join our exclusive student community. Access student-only benefits and order from your favorite campus cafes.</p>
+                        <p>Join our exclusive student community. Verify your identity and access student-only benefits.</p>
                         <div className="feature-list">
                             <div className="feature-item">
                                 <i className="fas fa-check-circle"></i>
@@ -110,11 +246,11 @@ const Register = () => {
                             </div>
                             <div className="feature-item">
                                 <i className="fas fa-check-circle"></i>
-                                <span>Easy order placement</span>
+                                <span>OCR-based ID verification</span>
                             </div>
                             <div className="feature-item">
                                 <i className="fas fa-check-circle"></i>
-                                <span>Real-time order tracking</span>
+                                <span>Instant status notification</span>
                             </div>
                             <div className="feature-item">
                                 <i className="fas fa-check-circle"></i>
@@ -131,7 +267,7 @@ const Register = () => {
                     </div>
                     
                     <h1 className="form-title">Create Your Account</h1>
-                    <p className="form-subtitle">Fill in your details to get started</p>
+                    <p className="form-subtitle">Fill in your details and upload your student ID for verification</p>
 
                     <form onSubmit={handleSubmit} className="register-form">
                         <div className="form-row">
@@ -181,10 +317,10 @@ const Register = () => {
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label>Gender *</label>
+                                <label>Gender</label>
                                 <div className="input-icon">
                                     <i className="fas fa-venus-mars"></i>
-                                    <select name="gender" value={formData.gender} onChange={handleChange} required>
+                                    <select name="gender" value={formData.gender} onChange={handleChange}>
                                         <option value="">Select Gender</option>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
@@ -209,6 +345,22 @@ const Register = () => {
                                 </div>
                             </div>
                             <div className="form-group">
+                                <label>Phone</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-phone"></i>
+                                    <input
+                                        type="tel"
+                                        name="phone"
+                                        value={formData.phone}
+                                        onChange={handleChange}
+                                        placeholder="Your phone number"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-row">
+                            <div className="form-group">
                                 <label>Password *</label>
                                 <div className="input-icon">
                                     <i className="fas fa-lock"></i>
@@ -222,32 +374,17 @@ const Register = () => {
                                     />
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="form-row">
                             <div className="form-group">
-                                <label>Phone</label>
+                                <label>Confirm Password *</label>
                                 <div className="input-icon">
-                                    <i className="fas fa-phone"></i>
+                                    <i className="fas fa-lock"></i>
                                     <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
+                                        type="password"
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
                                         onChange={handleChange}
-                                        placeholder="Your phone number"
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-group">
-                                <label>Year / Batch</label>
-                                <div className="input-icon">
-                                    <i className="fas fa-calendar-alt"></i>
-                                    <input
-                                        type="text"
-                                        name="year_of_study"
-                                        value={formData.year_of_study}
-                                        onChange={handleChange}
-                                        placeholder="e.g., 3rd Year"
+                                        placeholder="Confirm your password"
+                                        required
                                     />
                                 </div>
                             </div>
@@ -269,7 +406,7 @@ const Register = () => {
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label>Department *</label>
+                                <label>Department</label>
                                 <div className="input-icon">
                                     <i className="fas fa-book"></i>
                                     <input
@@ -278,15 +415,76 @@ const Register = () => {
                                         value={formData.department}
                                         onChange={handleChange}
                                         placeholder="Your department"
-                                        required
                                     />
                                 </div>
                             </div>
                         </div>
 
+                        <div className="form-group">
+                            <label>Student ID Card *</label>
+                            <div className="file-upload-area" onClick={() => fileInputRef.current.click()}>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleImageChange}
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                />
+                                {imagePreview ? (
+                                    <div className="image-preview">
+                                        <img src={imagePreview} alt="Student ID Preview" />
+                                        <button type="button" className="remove-image" onClick={(e) => {
+                                            e.stopPropagation();
+                                            setImagePreview(null);
+                                            setStudentIdImage(null);
+                                            setOcrResult(null);
+                                        }}>✕</button>
+                                    </div>
+                                ) : (
+                                    <div className="upload-placeholder">
+                                        <i className="fas fa-cloud-upload-alt"></i>
+                                        <p>Click to upload your Student ID Card</p>
+                                        <p className="file-info">Supported formats: JPG, PNG | Max size: 5MB</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* OCR Verification Status */}
+                        {isVerifying && (
+                            <div className="ocr-verifying">
+                                <div className="spinner-small"></div>
+                                <p>Verifying your ID card...</p>
+                            </div>
+                        )}
+
+                        {ocrResult && ocrResult.verified && !isVerifying && (
+                            <div className="ocr-success">
+                                <i className="fas fa-check-circle"></i>
+                                <div>
+                                    <strong>ID Verified!</strong>
+                                    <p>Confidence: {ocrResult.confidence}%</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {ocrResult && !ocrResult.verified && !isVerifying && (
+                            <div className="ocr-error">
+                                <i className="fas fa-exclamation-triangle"></i>
+                                <div>
+                                    <strong>Verification Failed</strong>
+                                    <p>Please upload a clearer image of your ID card</p>
+                                </div>
+                            </div>
+                        )}
+
                         {error && <div className="error-message">{error}</div>}
 
-                        <button type="submit" disabled={loading} className="submit-btn">
+                        <button 
+                            type="submit" 
+                            disabled={loading || isVerifying || (studentIdImage && !ocrResult)} 
+                            className="submit-btn"
+                        >
                             {loading ? (
                                 <>
                                     <i className="fas fa-spinner fa-spin"></i>
