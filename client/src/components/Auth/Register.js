@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useMutation } from '@apollo/client';
 import { Link, useNavigate } from 'react-router-dom';
-import { REGISTER_USER } from '../../graphql/mutations';
-import { useAuth } from '../../context/AuthContext';
+import { REGISTER_USER } from '../graphql/mutations';
+import { useAuth } from '../context/AuthContext';
+import './Register.css';
 
 const Register = () => {
     const [formData, setFormData] = useState({
@@ -14,12 +15,13 @@ const Register = () => {
         reg_no: '',
         institution: '',
         department: '',
-        year_of_study: ''
+        year_of_study: '',
+        gender: ''
     });
-    const [idImage, setIdImage] = useState(null);
-    const [idImagePreview, setIdImagePreview] = useState(null);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [studentInfo, setStudentInfo] = useState(null);
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -32,43 +34,23 @@ const Register = () => {
         });
     };
 
-    const handleImageCapture = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            setFormData({
-                ...formData,
-                id_image_base64: file
-            });
-            setIdImage(file);
-            setIdImagePreview(URL.createObjectURL(file));
-        }
-    };
-
-    const convertToBase64 = (file) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = (error) => reject(error);
-        });
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
 
         try {
-            let imageBase64 = null;
-            if (idImage) {
-                imageBase64 = await convertToBase64(idImage);
-            }
-
             const { data } = await registerMutation({
                 variables: {
                     input: {
-                        ...formData,
-                        id_image_base64: imageBase64,
+                        username: formData.username,
+                        full_name: formData.full_name,
+                        email: formData.email,
+                        password: formData.password,
+                        phone: formData.phone,
+                        reg_no: formData.reg_no,
+                        institution: formData.institution,
+                        department: formData.department,
                         year_of_study: parseInt(formData.year_of_study) || null
                     }
                 }
@@ -76,7 +58,16 @@ const Register = () => {
 
             if (data?.register) {
                 login(data.register.token, data.register.user);
-                navigate('/');
+                setStudentInfo({
+                    name: formData.full_name,
+                    reg_no: formData.reg_no,
+                    institution: formData.institution,
+                    department: formData.department
+                });
+                setShowSuccess(true);
+                setTimeout(() => {
+                    navigate('/');
+                }, 3000);
             }
         } catch (err) {
             setError(err.message || 'Registration failed. Please try again.');
@@ -85,239 +76,238 @@ const Register = () => {
         }
     };
 
+    if (showSuccess) {
+        return (
+            <div className="success-modal-overlay">
+                <div className="success-modal">
+                    <div className="success-icon">✓</div>
+                    <h2>Registration Successful!</h2>
+                    <p>Welcome to Campus Crave, {formData.full_name}!</p>
+                    <div className="student-info-card">
+                        <h3>Student Information</h3>
+                        <p><strong>Name:</strong> {studentInfo?.name}</p>
+                        <p><strong>Registration No:</strong> {studentInfo?.reg_no}</p>
+                        <p><strong>Institution:</strong> {studentInfo?.institution}</p>
+                        <p><strong>Department:</strong> {studentInfo?.department}</p>
+                    </div>
+                    <p className="redirect-message">Redirecting to home page...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div style={styles.container}>
-            <div style={styles.card}>
-                <h2 style={styles.title}>Create Account</h2>
-                <form onSubmit={handleSubmit}>
-                    <div style={styles.row}>
-                        <input
-                            type="text"
-                            name="username"
-                            placeholder="Username"
-                            value={formData.username}
-                            onChange={handleChange}
-                            style={styles.inputHalf}
-                            required
-                        />
-                        <input
-                            type="text"
-                            name="full_name"
-                            placeholder="Full Name"
-                            value={formData.full_name}
-                            onChange={handleChange}
-                            style={styles.inputHalf}
-                            required
-                        />
-                    </div>
-                    <input
-                        type="email"
-                        name="email"
-                        placeholder="Email Address"
-                        value={formData.email}
-                        onChange={handleChange}
-                        style={styles.input}
-                        required
-                    />
-                    <input
-                        type="password"
-                        name="password"
-                        placeholder="Password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        style={styles.input}
-                        required
-                    />
-                    <div style={styles.row}>
-                        <input
-                            type="text"
-                            name="phone"
-                            placeholder="Phone Number"
-                            value={formData.phone}
-                            onChange={handleChange}
-                            style={styles.inputHalf}
-                        />
-                        <input
-                            type="text"
-                            name="reg_no"
-                            placeholder="Registration Number"
-                            value={formData.reg_no}
-                            onChange={handleChange}
-                            style={styles.inputHalf}
-                            required
-                        />
-                    </div>
-                    <input
-                        type="text"
-                        name="institution"
-                        placeholder="Institution"
-                        value={formData.institution}
-                        onChange={handleChange}
-                        style={styles.input}
-                        required
-                    />
-                    <div style={styles.row}>
-                        <input
-                            type="text"
-                            name="department"
-                            placeholder="Department"
-                            value={formData.department}
-                            onChange={handleChange}
-                            style={styles.inputHalf}
-                        />
-                        <input
-                            type="number"
-                            name="year_of_study"
-                            placeholder="Year of Study"
-                            value={formData.year_of_study}
-                            onChange={handleChange}
-                            style={styles.inputHalf}
-                        />
-                    </div>
-                    
-                    {/* OCR Image Upload Section */}
-                    <div style={styles.imageSection}>
-                        <label style={styles.imageLabel}>Student ID Card (for verification)</label>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            onChange={handleImageCapture}
-                            style={styles.fileInput}
-                        />
-                        {idImagePreview && (
-                            <div style={styles.previewContainer}>
-                                <img src={idImagePreview} alt="ID Preview" style={styles.previewImage} />
-                                <p style={styles.previewText}>ID Card uploaded successfully</p>
+        <div className="register-container">
+            <div className="register-wrapper">
+                <div className="register-illustration">
+                    <div className="illustration-content">
+                        <h1>Campus Crave</h1>
+                        <p>Join our exclusive student community. Access student-only benefits and order from your favorite campus cafes.</p>
+                        <div className="feature-list">
+                            <div className="feature-item">
+                                <i className="fas fa-check-circle"></i>
+                                <span>Secure & verified registration</span>
                             </div>
-                        )}
-                        <p style={styles.noteText}>
-                            Please upload a clear photo of your student ID card for verification
-                        </p>
+                            <div className="feature-item">
+                                <i className="fas fa-check-circle"></i>
+                                <span>Easy order placement</span>
+                            </div>
+                            <div className="feature-item">
+                                <i className="fas fa-check-circle"></i>
+                                <span>Real-time order tracking</span>
+                            </div>
+                            <div className="feature-item">
+                                <i className="fas fa-check-circle"></i>
+                                <span>Exclusive student discounts</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="register-form-container">
+                    <div className="form-header">
+                        <i className="fas fa-graduation-cap"></i>
+                        <h2>Student Registration</h2>
                     </div>
                     
-                    {error && <div style={styles.error}>{error}</div>}
-                    <button type="submit" disabled={loading} style={styles.button}>
-                        {loading ? 'Creating Account...' : 'Register'}
-                    </button>
-                </form>
-                <p style={styles.footer}>
-                    Already have an account? <Link to="/login" style={styles.link}>Login here</Link>
-                </p>
+                    <h1 className="form-title">Create Your Account</h1>
+                    <p className="form-subtitle">Fill in your details to get started</p>
+
+                    <form onSubmit={handleSubmit} className="register-form">
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Full Name *</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-user"></i>
+                                    <input
+                                        type="text"
+                                        name="full_name"
+                                        value={formData.full_name}
+                                        onChange={handleChange}
+                                        placeholder="Enter your full name"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Username *</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-id-badge"></i>
+                                    <input
+                                        type="text"
+                                        name="username"
+                                        value={formData.username}
+                                        onChange={handleChange}
+                                        placeholder="Choose a username"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Registration Number *</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-id-card"></i>
+                                    <input
+                                        type="text"
+                                        name="reg_no"
+                                        value={formData.reg_no}
+                                        onChange={handleChange}
+                                        placeholder="e.g., CST/123/14"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Gender *</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-venus-mars"></i>
+                                    <select name="gender" value={formData.gender} onChange={handleChange} required>
+                                        <option value="">Select Gender</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Email *</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-envelope"></i>
+                                    <input
+                                        type="email"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                        placeholder="your@email.com"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Password *</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-lock"></i>
+                                    <input
+                                        type="password"
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        placeholder="Create a password"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Phone</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-phone"></i>
+                                    <input
+                                        type="tel"
+                                        name="phone"
+                                        value={formData.phone}
+                                        onChange={handleChange}
+                                        placeholder="Your phone number"
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Year / Batch</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-calendar-alt"></i>
+                                    <input
+                                        type="text"
+                                        name="year_of_study"
+                                        value={formData.year_of_study}
+                                        onChange={handleChange}
+                                        placeholder="e.g., 3rd Year"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Institution *</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-university"></i>
+                                    <input
+                                        type="text"
+                                        name="institution"
+                                        value={formData.institution}
+                                        onChange={handleChange}
+                                        placeholder="Your university/college"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Department *</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-book"></i>
+                                    <input
+                                        type="text"
+                                        name="department"
+                                        value={formData.department}
+                                        onChange={handleChange}
+                                        placeholder="Your department"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {error && <div className="error-message">{error}</div>}
+
+                        <button type="submit" disabled={loading} className="submit-btn">
+                            {loading ? (
+                                <>
+                                    <i className="fas fa-spinner fa-spin"></i>
+                                    Processing...
+                                </>
+                            ) : (
+                                <>
+                                    <i className="fas fa-user-plus"></i>
+                                    Register Student
+                                </>
+                            )}
+                        </button>
+
+                        <p className="login-link">
+                            Already have an account? <Link to="/login">Login here</Link>
+                        </p>
+                    </form>
+                </div>
             </div>
         </div>
     );
-};
-
-const styles = {
-    container: {
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '80vh',
-        padding: '20px',
-    },
-    card: {
-        background: 'white',
-        padding: '40px',
-        borderRadius: '10px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        width: '100%',
-        maxWidth: '550px',
-    },
-    title: {
-        textAlign: 'center',
-        marginBottom: '30px',
-        color: '#2c3e50',
-    },
-    row: {
-        display: 'flex',
-        gap: '15px',
-        marginBottom: '15px',
-    },
-    input: {
-        width: '100%',
-        padding: '12px',
-        marginBottom: '15px',
-        border: '1px solid #ddd',
-        borderRadius: '5px',
-        fontSize: '14px',
-        boxSizing: 'border-box',
-    },
-    inputHalf: {
-        width: 'calc(50% - 7.5px)',
-        padding: '12px',
-        border: '1px solid #ddd',
-        borderRadius: '5px',
-        fontSize: '14px',
-        boxSizing: 'border-box',
-    },
-    imageSection: {
-        margin: '15px 0',
-        padding: '15px',
-        backgroundColor: '#f8f9fa',
-        borderRadius: '8px',
-    },
-    imageLabel: {
-        display: 'block',
-        marginBottom: '10px',
-        fontWeight: 'bold',
-        color: '#2c3e50',
-    },
-    fileInput: {
-        width: '100%',
-        padding: '10px',
-        border: '1px solid #ddd',
-        borderRadius: '5px',
-        backgroundColor: 'white',
-    },
-    previewContainer: {
-        marginTop: '10px',
-        textAlign: 'center',
-    },
-    previewImage: {
-        maxWidth: '100%',
-        maxHeight: '150px',
-        borderRadius: '8px',
-    },
-    previewText: {
-        marginTop: '5px',
-        fontSize: '12px',
-        color: '#27ae60',
-    },
-    noteText: {
-        marginTop: '10px',
-        fontSize: '11px',
-        color: '#888',
-        textAlign: 'center',
-    },
-    button: {
-        width: '100%',
-        padding: '12px',
-        backgroundColor: '#27ae60',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        fontSize: '16px',
-        fontWeight: 'bold',
-    },
-    error: {
-        color: '#e74c3c',
-        textAlign: 'center',
-        marginBottom: '15px',
-        padding: '10px',
-        backgroundColor: '#fdecea',
-        borderRadius: '5px',
-    },
-    footer: {
-        textAlign: 'center',
-        marginTop: '20px',
-    },
-    link: {
-        color: '#3498db',
-        textDecoration: 'none',
-    },
 };
 
 export default Register;
