@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useMutation } from '@apollo/client';
 import { Link, useNavigate } from 'react-router-dom';
-import { REGISTER_USER } from '../graphql/mutations';
-import { useAuth } from '../context/AuthContext';
+import { REGISTER_USER } from '../../graphql/mutations';
+import { useAuth } from '../../context/AuthContext';
 import './Register.css';
 
 const Register = () => {

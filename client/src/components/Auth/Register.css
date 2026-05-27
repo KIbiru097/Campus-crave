@@ -31,7 +31,6 @@
     }
 }
 
-/* Illustration Section */
 .register-illustration {
     flex: 1;
     background: linear-gradient(135deg, #5c6bc0, #3949ab);
@@ -45,7 +44,6 @@
 .illustration-content h1 {
     font-size: 42px;
     margin-bottom: 20px;
-    animation: fadeInLeft 0.8s ease-out;
 }
 
 .illustration-content p {
@@ -65,14 +63,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    animation: fadeInLeft 0.6s ease-out;
-    animation-fill-mode: both;
 }
-
-.feature-item:nth-child(1) { animation-delay: 0.1s; }
-.feature-item:nth-child(2) { animation-delay: 0.2s; }
-.feature-item:nth-child(3) { animation-delay: 0.3s; }
-.feature-item:nth-child(4) { animation-delay: 0.4s; }
 
 .feature-item i {
     font-size: 20px;
@@ -83,7 +74,6 @@
     font-size: 14px;
 }
 
-/* Form Section */
 .register-form-container {
     flex: 1.2;
     padding: 40px;
@@ -119,7 +109,6 @@
     font-size: 14px;
 }
 
-/* Form Styles */
 .register-form {
     max-height: 500px;
     overflow-y: auto;
@@ -189,12 +178,6 @@
     box-shadow: 0 0 0 3px rgba(92, 107, 192, 0.1);
 }
 
-.input-icon input:hover,
-.input-icon select:hover {
-    border-color: #5c6bc0;
-}
-
-/* Submit Button */
 .submit-btn {
     width: 100%;
     padding: 14px;
@@ -223,7 +206,6 @@
     cursor: not-allowed;
 }
 
-/* Error Message */
 .error-message {
     background: #fee;
     color: #e74c3c;
@@ -234,7 +216,6 @@
     font-size: 14px;
 }
 
-/* Login Link */
 .login-link {
     text-align: center;
     margin-top: 20px;
@@ -248,11 +229,6 @@
     font-weight: 600;
 }
 
-.login-link a:hover {
-    text-decoration: underline;
-}
-
-/* Success Modal */
 .success-modal-overlay {
     position: fixed;
     top: 0;
@@ -264,12 +240,6 @@
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
 }
 
 .success-modal {
@@ -279,18 +249,6 @@
     max-width: 500px;
     width: 90%;
     text-align: center;
-    animation: scaleIn 0.3s ease-out;
-}
-
-@keyframes scaleIn {
-    from {
-        opacity: 0;
-        transform: scale(0.9);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
 }
 
 .success-icon {
@@ -305,13 +263,6 @@
     align-items: center;
     justify-content: center;
     margin: 0 auto 20px;
-    animation: pulse 0.5s ease-out;
-}
-
-@keyframes pulse {
-    0% { transform: scale(0); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
 }
 
 .student-info-card {
@@ -327,17 +278,11 @@
     margin-bottom: 15px;
 }
 
-.student-info-card p {
-    margin: 8px 0;
-    color: #555;
-}
-
 .redirect-message {
     color: #888;
     font-size: 14px;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
     .register-wrapper {
         flex-direction: column;
@@ -363,20 +308,4 @@
     .form-title {
         font-size: 24px;
     }
-    
-    .success-modal {
-        padding: 30px 20px;
-        margin: 20px;
-    }
 }
-
-/* Animation for form fields */
-.form-group {
-    animation: fadeInUp 0.5s ease-out;
-    animation-fill-mode: both;
-}
-
-.form-group:nth-child(1) { animation-delay: 0.05s; }
-.form-group:nth-child(2) { animation-delay: 0.1s; }
-.form-group:nth-child(3) { animation-delay: 0.15s; }
-.form-group:nth-child(4) { animation-delay: 0.2s; }
