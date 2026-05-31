@@ -12,6 +12,8 @@ import CartPage from './pages/CartPage';
 import OrdersPage from './pages/OrdersPage';
 import ProfilePage from './pages/ProfilePage';
 import MockPayment from './components/MockPayment';
+import CheckoutPage from './pages/CheckoutPage';
+import PaymentPage from './pages/PaymentPage';
 
 function App() {
     return (
@@ -29,6 +31,16 @@ function App() {
                         <Route path="/profile" element={<ProfilePage />} />
                         <Route path="/mock-payment" element={<MockPayment />} />
                         <Route path="/payment/success" element={<MockPayment />} />
+                        <Route path="/checkout" element={
+    <ProtectedRoute>
+        <CheckoutPage />
+    </ProtectedRoute>
+} />
+<Route path="/payment" element={
+    <ProtectedRoute>
+        <PaymentPage />
+    </ProtectedRoute>
+} />
                     </Routes>
                 </AuthProvider>
             </BrowserRouter>

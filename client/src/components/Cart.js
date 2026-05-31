@@ -100,71 +100,14 @@ const Cart = () => {
             }
         }
     };
-
-    const handleProceedToCheckout = async () => {
-        if (!items.length) {
-            alert('Your cart is empty');
-            return;
-        }
-
-        // Validate payment method against business rules
-        if (paymentRules?.requiredOnline && paymentMethod !== 'Online') {
-            setPaymentError('This order requires online payment. Cash on delivery is not available for 4+ items.');
-            return;
-        }
-
-        if (!paymentRules?.allowedMethods.includes(paymentMethod)) {
-            setPaymentError(`Payment method ${paymentMethod} is not available for this order.`);
-            return;
-        }
-
-        setPaymentError('');
-        setProcessing(true);
-
-        try {
-            // Get cafe ID from first item
-            const cafeId = items[0]?.menu_item?.cafe_id || 1;
-
-            const { data: orderData } = await createOrder({
-                variables: {
-                    input: {
-                        cafe_id: cafeId,
-                        payment_type: paymentMethod === 'COD' ? 'COD' : 'Online',
-                        special_instructions: null
-                    }
-                }
-            });
-            
-            if (orderData?.createOrder) {
-                const order = orderData.createOrder;
-                
-                if (paymentMethod === 'COD') {
-                    // For COD: order placed, pay on delivery
-                    alert(`✅ Order placed successfully!\n\nOrder #: ${order.order_number}\nTotal: ETB ${cart.total}\nPayment: Cash on Delivery\n\nPlease have exact change ready.`);
-                    refetch();
-                    navigate('/orders');
-                } else {
-                    // For Online payment: go to payment page
-                    let paymentAmount = cart.total;
-                    let paymentPercentage = 100;
-                    
-                    // Check if partial payment is allowed (1-3 items)
-                    if (itemCount <= 3 && paymentRules?.partialAllowed) {
-                        paymentAmount = cart.total * 0.5;
-                        paymentPercentage = 50;
-                    }
-                    
-                    // Redirect to mock payment page
-                    window.location.href = `http://localhost:3000/mock-payment?tx_ref=MOCK-${order.id}-${Date.now()}&amount=${paymentAmount}&order_id=${order.id}&item_count=${itemCount}&payment_percentage=${paymentPercentage}&total_amount=${cart.total}`;
-                }
-            }
-        } catch (err) {
-            console.error('Checkout error:', err);
-            alert('Failed to create order: ' + err.message);
-        } finally {
-            setProcessing(false);
-        }
-    };
+    
+    const handleProceedToCheckout = () => {
+    if (!items.length) {
+        alert('Your cart is empty');
+        return;
+    }
+    navigate('/checkout');
+};
 
     if (loading) return <div className="loading">Loading cart...</div>;
     if (error) return <div className="error">Error: {error.message}</div>;
