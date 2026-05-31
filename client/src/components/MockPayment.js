@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
 const MockPayment = () => {
     const [searchParams] = useSearchParams();
@@ -12,17 +10,20 @@ const MockPayment = () => {
     const txRef = searchParams.get('tx_ref');
     const amount = searchParams.get('amount');
     const orderId = searchParams.get('order_id');
+    const itemCount = searchParams.get('item_count');
+    const paymentPercentage = searchParams.get('payment_percentage');
     
     const [processing, setProcessing] = useState(false);
     const [countdown, setCountdown] = useState(5);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [showPartialWarning, setShowPartialWarning] = useState(false);
 
-    const handleMockPayment = useCallback(async () => {
+    const handleMockPayment = async () => {
         setProcessing(true);
         
         setTimeout(async () => {
             try {
-                const response = await fetch(`${BACKEND_URL}/api/payment/verify/${txRef}`);
+                const response = await fetch(`http://localhost:4000/api/payment/verify/${txRef}`);
                 const result = await response.json();
                 
                 if (result.success) {
@@ -46,27 +47,46 @@ const MockPayment = () => {
                 setTimeout(() => navigate('/orders'), 3000);
             }
         }, 2000);
-    }, [txRef, navigate]);
+    };
 
     useEffect(() => {
         if (txRef && amount) {
+            // Check if this is a partial payment
+            if (paymentPercentage && parseInt(paymentPercentage) < 100) {
+                setShowPartialWarning(true);
+            }
             setTimeout(() => handleMockPayment(), 1000);
         }
-    }, [txRef, amount, handleMockPayment]);
+    }, [txRef, amount]);
 
     if (showSuccess) {
+        const isPartial = paymentPercentage && parseInt(paymentPercentage) < 100;
+        const remainingAmount = isPartial ? parseFloat(amount) * (100 / parseInt(paymentPercentage) - 1) : 0;
+        
         return (
             <div style={styles.container}>
                 <div style={styles.successCard}>
                     <div style={styles.checkmark}>✓</div>
-                    <h2 style={styles.successTitle}>Payment Successful!</h2>
-                    <p style={styles.successText}>Your payment has been processed successfully.</p>
+                    <h2 style={styles.successTitle}>Order Placed Successfully!</h2>
                     <div style={styles.details}>
+                        <p><strong>Order ID:</strong> {orderId}</p>
                         <p><strong>Transaction ID:</strong> {txRef}</p>
+                        <p><strong>Items:</strong> {itemCount}</p>
                         <p><strong>Amount Paid:</strong> ETB {amount}</p>
-                        <p><strong>Status:</strong> <span style={styles.paidStatus}>Completed</span></p>
+                        {isPartial && (
+                            <>
+                                <p><strong>Payment Type:</strong> Partial Payment (50%)</p>
+                                <p><strong>Remaining Balance:</strong> ETB {remainingAmount} (to be paid on delivery)</p>
+                            </>
+                        )}
+                        <p><strong>Status:</strong> <span style={styles.paidStatus}>Confirmed</span></p>
                     </div>
-                    <p style={styles.redirectNote}>Redirecting to orders in {countdown} seconds...</p>
+                    {isPartial && (
+                        <div style={styles.partialNote}>
+                            ⚠️ You have made a 50% partial payment. The remaining ETB {remainingAmount} will be collected upon delivery.
+                        </div>
+                    )}
+                    <p>Redirecting to orders in {countdown} seconds...</p>
                     <button onClick={() => navigate('/orders')} style={styles.button}>
                         Go to My Orders
                     </button>
@@ -75,11 +95,19 @@ const MockPayment = () => {
         );
     }
 
+    const isPartialPayment = paymentPercentage && parseInt(paymentPercentage) < 100;
+
     return (
         <div style={styles.container}>
             <div style={styles.card}>
-                <h2 style={styles.title}>💳 Mock Payment Demo</h2>
-                <p style={styles.subtitle}>This is a simulation for demonstration purposes.</p>
+                <h2 style={styles.title}>💳 Complete Payment</h2>
+                
+                {showPartialWarning && (
+                    <div style={styles.warningCard}>
+                        <p>⚠️ This is a <strong>50% partial payment</strong> for your order.</p>
+                        <p>The remaining 50% will be paid when you receive your order.</p>
+                    </div>
+                )}
                 
                 <div style={styles.orderDetails}>
                     <h3>Order Summary</h3>
@@ -88,29 +116,39 @@ const MockPayment = () => {
                         <strong>{orderId}</strong>
                     </div>
                     <div style={styles.detailRow}>
-                        <span>Amount:</span>
-                        <strong style={styles.amount}>ETB {amount}</strong>
+                        <span>Items:</span>
+                        <strong>{itemCount} items</strong>
                     </div>
-                    <div style={styles.detailRow}>
-                        <span>Transaction:</span>
-                        <strong>{txRef}</strong>
-                    </div>
-                    <div style={styles.detailRow}>
-                        <span>Customer:</span>
-                        <strong>{user?.username || 'Guest'}</strong>
-                    </div>
+                    {isPartialPayment ? (
+                        <>
+                            <div style={styles.detailRow}>
+                                <span>Total Amount:</span>
+                                <strong style={styles.amount}>ETB {parseFloat(amount) * 2}</strong>
+                            </div>
+                            <div style={styles.detailRow}>
+                                <span>Pay Now (50%):</span>
+                                <strong style={styles.partialAmount}>ETB {amount}</strong>
+                            </div>
+                            <div style={styles.detailRow}>
+                                <span>Pay on Delivery (50%):</span>
+                                <strong>ETB {parseFloat(amount)}</strong>
+                            </div>
+                        </>
+                    ) : (
+                        <div style={styles.detailRow}>
+                            <span>Total Amount:</span>
+                            <strong style={styles.amount}>ETB {amount}</strong>
+                        </div>
+                    )}
                 </div>
 
-                <div style={styles.demoCard}>
-                    <p style={styles.demoLabel}>🎭 Demo Mode Information</p>
-                    <p style={styles.demoText}>
-                        This is a simulated payment. No real money will be charged.
-                        Click "Pay Now" to complete the demo transaction.
-                    </p>
+                <div style={styles.paymentInfo}>
+                    <h4>Payment Details</h4>
                     <div style={styles.mockCardDetails}>
-                        <p>Mock Card Details (for display only):</p>
-                        <code style={styles.code}>4242 4242 4242 4242</code>
-                        <code style={styles.code}>Expiry: 12/25 | CVV: 123</code>
+                        <p>Test Card Information:</p>
+                        <code>4242 4242 4242 4242</code>
+                        <code>Expiry: 12/25 | CVV: 123</code>
+                        <p style={styles.demoNote}>* This is a mock payment. No real charge will be applied.</p>
                     </div>
                 </div>
 
@@ -120,17 +158,10 @@ const MockPayment = () => {
                         <p>Processing payment...</p>
                     </div>
                 ) : (
-                    <button 
-                        onClick={handleMockPayment} 
-                        style={styles.payButton}
-                    >
-                        💳 Pay ETB {amount}
+                    <button onClick={handleMockPayment} style={styles.payButton}>
+                        {isPartialPayment ? `Pay 50% (ETB ${amount}) Now` : `Pay ETB ${amount} Now`}
                     </button>
                 )}
-
-                <p style={styles.note}>
-                    ⚡ Demo Mode: No real payment will be charged. This is for demonstration only.
-                </p>
             </div>
         </div>
     );
@@ -143,7 +174,7 @@ const styles = {
         alignItems: 'center',
         minHeight: '80vh',
         padding: '20px',
-        backgroundColor: '#f5f5f5'
+        backgroundColor: '#f5f5f5',
     },
     card: {
         background: 'white',
@@ -152,62 +183,61 @@ const styles = {
         boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
         width: '100%',
         maxWidth: '500px',
-        textAlign: 'center'
     },
     title: {
+        textAlign: 'center',
+        marginBottom: '30px',
         color: '#2c3e50',
-        marginBottom: '10px'
     },
-    subtitle: {
-        color: '#666',
-        marginBottom: '30px'
+    warningCard: {
+        backgroundColor: '#fef3c7',
+        padding: '15px',
+        borderRadius: '10px',
+        marginBottom: '20px',
+        border: '1px solid #f59e0b',
     },
     orderDetails: {
         backgroundColor: '#f8f9fa',
         padding: '20px',
         borderRadius: '10px',
-        textAlign: 'left',
-        marginBottom: '20px'
+        marginBottom: '20px',
     },
     detailRow: {
         display: 'flex',
         justifyContent: 'space-between',
         padding: '8px 0',
-        borderBottom: '1px solid #e9ecef'
+        borderBottom: '1px solid #e9ecef',
     },
     amount: {
         color: '#27ae60',
-        fontSize: '18px'
-    },
-    demoCard: {
-        backgroundColor: '#e8f4fd',
-        padding: '20px',
-        borderRadius: '10px',
-        marginBottom: '20px'
-    },
-    demoLabel: {
         fontWeight: 'bold',
-        color: '#0066cc',
-        marginBottom: '10px'
+        fontSize: '18px',
     },
-    demoText: {
-        fontSize: '14px',
-        color: '#555',
-        marginBottom: '15px'
+    partialAmount: {
+        color: '#f39c12',
+        fontWeight: 'bold',
+    },
+    paymentInfo: {
+        marginBottom: '20px',
     },
     mockCardDetails: {
-        backgroundColor: 'white',
+        backgroundColor: '#e8f4fd',
         padding: '15px',
-        borderRadius: '8px',
-        marginTop: '10px'
+        borderRadius: '10px',
+        marginTop: '10px',
+    },
+    demoNote: {
+        fontSize: '12px',
+        color: '#666',
+        marginTop: '10px',
     },
     code: {
         display: 'block',
         fontFamily: 'monospace',
-        padding: '5px',
+        padding: '8px',
         margin: '5px 0',
-        backgroundColor: '#f0f0f0',
-        borderRadius: '4px'
+        backgroundColor: 'white',
+        borderRadius: '4px',
     },
     payButton: {
         width: '100%',
@@ -219,11 +249,11 @@ const styles = {
         fontSize: '18px',
         fontWeight: 'bold',
         cursor: 'pointer',
-        transition: 'background 0.3s'
+        transition: 'all 0.3s',
     },
     processing: {
         textAlign: 'center',
-        padding: '20px'
+        padding: '20px',
     },
     spinner: {
         border: '3px solid #f3f3f3',
@@ -232,12 +262,7 @@ const styles = {
         width: '40px',
         height: '40px',
         animation: 'spin 1s linear infinite',
-        margin: '0 auto 15px auto'
-    },
-    note: {
-        marginTop: '20px',
-        fontSize: '12px',
-        color: '#888'
+        margin: '0 auto 15px',
     },
     successCard: {
         background: 'white',
@@ -246,7 +271,7 @@ const styles = {
         boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
         width: '100%',
         maxWidth: '500px',
-        textAlign: 'center'
+        textAlign: 'center',
     },
     checkmark: {
         width: '80px',
@@ -256,24 +281,29 @@ const styles = {
         borderRadius: '50%',
         fontSize: '50px',
         lineHeight: '80px',
-        margin: '0 auto 20px auto'
+        margin: '0 auto 20px',
     },
     successTitle: {
         color: '#27ae60',
-        marginBottom: '15px'
+        marginBottom: '20px',
     },
-    successText: {
-        color: '#666',
-        marginBottom: '20px'
+    details: {
+        margin: '20px 0',
+        padding: '15px',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '10px',
+        textAlign: 'left',
     },
     paidStatus: {
         color: '#27ae60',
-        fontWeight: 'bold'
+        fontWeight: 'bold',
     },
-    redirectNote: {
-        marginTop: '20px',
-        color: '#888',
-        fontSize: '14px'
+    partialNote: {
+        backgroundColor: '#fef3c7',
+        padding: '10px',
+        borderRadius: '8px',
+        marginTop: '10px',
+        fontSize: '14px',
     },
     button: {
         marginTop: '20px',
@@ -282,11 +312,11 @@ const styles = {
         color: 'white',
         border: 'none',
         borderRadius: '8px',
-        cursor: 'pointer'
-    }
+        cursor: 'pointer',
+    },
 };
 
-// Add animation for spinner
+// Add keyframe animation
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
     @keyframes spin {
