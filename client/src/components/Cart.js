@@ -2,20 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Link, useNavigate } from 'react-router-dom';
 import { GET_CART } from '../graphql/queries';
-import { UPDATE_CART_ITEM, REMOVE_FROM_CART, CLEAR_CART, CREATE_ORDER } from '../graphql/mutations';
+import { UPDATE_CART_ITEM, REMOVE_FROM_CART, CLEAR_CART } from '../graphql/mutations';
 
 const Cart = () => {
     const navigate = useNavigate();
-    const [paymentMethod, setPaymentMethod] = useState('Online');
-    const [paymentError, setPaymentError] = useState('');
     const [paymentRules, setPaymentRules] = useState(null);
-    const [processing, setProcessing] = useState(false);
     
     const { loading, error, data, refetch } = useQuery(GET_CART);
     const [updateCartItem] = useMutation(UPDATE_CART_ITEM);
     const [removeFromCart] = useMutation(REMOVE_FROM_CART);
     const [clearCart] = useMutation(CLEAR_CART);
-    const [createOrder] = useMutation(CREATE_ORDER);
 
     // Get payment rules based on item count (from documentation)
     const getPaymentRules = (count) => {
@@ -56,10 +52,6 @@ const Cart = () => {
     useEffect(() => {
         const rules = getPaymentRules(itemCount);
         setPaymentRules(rules);
-        // If only online is allowed, force set to Online
-        if (rules.allowedMethods.length === 1 && rules.allowedMethods[0] === 'Online') {
-            setPaymentMethod('Online');
-        }
     }, [itemCount]);
 
     const handleUpdateQuantity = async (cartItemId, currentQty, change) => {
@@ -100,14 +92,14 @@ const Cart = () => {
             }
         }
     };
-    
+
     const handleProceedToCheckout = () => {
-    if (!items.length) {
-        alert('Your cart is empty');
-        return;
-    }
-    navigate('/checkout');
-};
+        if (!items.length) {
+            alert('Your cart is empty');
+            return;
+        }
+        navigate('/checkout');
+    };
 
     if (loading) return <div className="loading">Loading cart...</div>;
     if (error) return <div className="error">Error: {error.message}</div>;
@@ -124,6 +116,10 @@ const Cart = () => {
             </div>
         );
     }
+
+    const deliveryFee = total > 150 ? 0 : 30;
+    const serviceFee = 10;
+    const grandTotal = total + deliveryFee + serviceFee;
 
     return (
         <div style={styles.container}>
@@ -176,64 +172,30 @@ const Cart = () => {
                 </div>
                 <div style={styles.summaryRow}>
                     <span>Delivery Fee:</span>
-                    <span>ETB {total > 150 ? 0 : 30}</span>
+                    <span>ETB {deliveryFee} {deliveryFee === 0 && '(Free)'}</span>
                 </div>
                 <div style={styles.summaryRow}>
                     <span>Service Fee:</span>
-                    <span>ETB 10</span>
+                    <span>ETB {serviceFee}</span>
                 </div>
                 <div style={styles.divider}></div>
                 <div style={styles.summaryRowTotal}>
                     <span>Total:</span>
-                    <span>ETB {total + (total > 150 ? 10 : 40)}</span>
+                    <span>ETB {grandTotal}</span>
                 </div>
             </div>
 
-            {/* Payment Selection Section */}
+            {/* Payment Rules Info */}
             {paymentRules && (
-                <div style={styles.paymentSection}>
-                    <h4>Select Payment Method</h4>
-                    <div style={styles.paymentOptions}>
-                        {paymentRules.allowedMethods.includes('Online') && (
-                            <label style={styles.paymentOption}>
-                                <input
-                                    type="radio"
-                                    name="paymentMethod"
-                                    value="Online"
-                                    checked={paymentMethod === 'Online'}
-                                    onChange={() => setPaymentMethod('Online')}
-                                />
-                                <span>💳 Online Payment</span>
-                                {paymentRules.partialAllowed && (
-                                    <small style={styles.partialNote}>(50% now, 50% on delivery)</small>
-                                )}
-                            </label>
-                        )}
-                        {paymentRules.allowedMethods.includes('COD') && (
-                            <label style={styles.paymentOption}>
-                                <input
-                                    type="radio"
-                                    name="paymentMethod"
-                                    value="COD"
-                                    checked={paymentMethod === 'COD'}
-                                    onChange={() => setPaymentMethod('COD')}
-                                />
-                                <span>💵 Cash on Delivery</span>
-                            </label>
-                        )}
-                    </div>
-                    
-                    {paymentError && <div style={styles.paymentError}>{paymentError}</div>}
-                    
-                    <div style={styles.rulesInfo}>
-                        <small>📋 {paymentRules.message}</small>
-                        {itemCount >= 4 && (
-                            <small style={styles.warning}>⚠️ Online payment required for 4+ items</small>
-                        )}
-                        {itemCount <= 3 && (
-                            <small style={styles.info}>ℹ️ You can pay 50% now and 50% on delivery</small>
-                        )}
-                    </div>
+                <div style={styles.rulesCard}>
+                    <h4>📋 Payment Rules</h4>
+                    <p>{paymentRules.message}</p>
+                    {itemCount >= 4 && (
+                        <p style={styles.warning}>⚠️ Online payment required for 4+ items</p>
+                    )}
+                    {itemCount <= 3 && (
+                        <p style={styles.info}>ℹ️ You can pay 50% now and 50% on delivery</p>
+                    )}
                 </div>
             )}
 
@@ -245,22 +207,9 @@ const Cart = () => {
                 <button 
                     onClick={handleProceedToCheckout} 
                     style={styles.checkoutBtn}
-                    disabled={processing}
                 >
-                    {processing ? 'Processing...' : 'Proceed to Checkout'}
+                    Proceed to Checkout →
                 </button>
-            </div>
-
-            {/* Business Rules Notice */}
-            <div style={styles.rulesNotice}>
-                <p>📋 <strong>Payment Rules:</strong></p>
-                <ul>
-                    <li>✓ Maximum 6 items per order</li>
-                    <li>✓ 1-3 items: Choose Online or Cash on Delivery</li>
-                    <li>✓ 4-6 items: Online payment only</li>
-                    <li>✓ 1-3 items: 50% partial payment available</li>
-                    <li>✓ Free delivery on orders above ETB 150</li>
-                </ul>
             </div>
         </div>
     );
@@ -374,64 +323,27 @@ const styles = {
         backgroundColor: '#eee',
         margin: '10px 0',
     },
-    paymentSection: {
-        backgroundColor: 'white',
+    rulesCard: {
+        backgroundColor: '#f0f7ff',
         borderRadius: '12px',
-        padding: '20px',
+        padding: '15px',
         marginBottom: '20px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    },
-    paymentOptions: {
-        display: 'flex',
-        gap: '30px',
-        marginTop: '15px',
-        flexWrap: 'wrap',
-    },
-    paymentOption: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        cursor: 'pointer',
-        padding: '10px',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        backgroundColor: '#f9f9f9',
-    },
-    partialNote: {
-        fontSize: '11px',
-        color: '#f39c12',
-        marginLeft: '5px',
-    },
-    paymentError: {
-        color: '#e74c3c',
-        marginTop: '10px',
-        fontSize: '14px',
-        padding: '8px',
-        backgroundColor: '#fdecea',
-        borderRadius: '6px',
-    },
-    rulesInfo: {
-        marginTop: '15px',
-        paddingTop: '10px',
-        borderTop: '1px solid #eee',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '5px',
     },
     warning: {
         color: '#e74c3c',
         fontWeight: 'bold',
+        marginTop: '5px',
         fontSize: '12px',
     },
     info: {
         color: '#27ae60',
+        marginTop: '5px',
         fontSize: '12px',
     },
     actionButtons: {
         display: 'flex',
         gap: '15px',
         justifyContent: 'flex-end',
-        marginTop: '20px',
     },
     clearBtn: {
         padding: '12px 24px',
@@ -452,14 +364,6 @@ const styles = {
         cursor: 'pointer',
         fontSize: '16px',
         fontWeight: 'bold',
-    },
-    rulesNotice: {
-        marginTop: '30px',
-        padding: '15px',
-        backgroundColor: '#f0f7ff',
-        borderRadius: '8px',
-        fontSize: '12px',
-        color: '#555',
     },
     emptyContainer: {
         textAlign: 'center',
