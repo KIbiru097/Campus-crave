@@ -13,32 +13,28 @@ const Cart = () => {
     const [removeFromCart] = useMutation(REMOVE_FROM_CART);
     const [clearCart] = useMutation(CLEAR_CART);
 
-    // Get payment rules based on item count (from documentation)
     const getPaymentRules = (count) => {
         if (count >= 4 && count <= 6) {
             return {
                 allowedMethods: ['Online'],
                 requiredOnline: true,
-                message: 'Orders with 4-6 items require full online payment. Cash on delivery is not allowed.',
+                message: 'Orders with 4-6 items require full online payment.',
                 partialAllowed: false,
-                amountDue: 'Full'
             };
         } else if (count >= 1 && count <= 3) {
             return {
                 allowedMethods: ['Online', 'COD'],
                 requiredOnline: false,
-                message: 'You can choose between online payment or cash on delivery',
+                message: 'You can choose online payment or cash on delivery',
                 partialAllowed: true,
                 partialPercentage: 50,
-                amountDue: 'Full or 50% partial'
             };
         } else {
             return {
                 allowedMethods: [],
                 requiredOnline: false,
-                message: 'Invalid order quantity. Maximum 6 items per order.',
+                message: 'Maximum 6 items per order.',
                 partialAllowed: false,
-                amountDue: 'N/A'
             };
         }
     };
@@ -48,7 +44,6 @@ const Cart = () => {
     const total = cart?.total || 0;
     const itemCount = cart?.item_count || 0;
 
-    // Update payment rules when cart changes
     useEffect(() => {
         const rules = getPaymentRules(itemCount);
         setPaymentRules(rules);
@@ -123,7 +118,7 @@ const Cart = () => {
 
     return (
         <div style={styles.container}>
-            <h2 style={styles.title}>Shopping Cart</h2>
+            <h2 style={styles.title}>🛒 Shopping Cart</h2>
             
             <div style={styles.itemsContainer}>
                 {items.map((item) => (
@@ -131,9 +126,6 @@ const Cart = () => {
                         <div style={styles.itemDetails}>
                             <h4>{item.menu_item?.name}</h4>
                             <p style={styles.itemPrice}>ETB {item.unit_price} each</p>
-                            {item.customizations && (
-                                <p style={styles.customizations}>Note: {item.customizations}</p>
-                            )}
                         </div>
                         <div style={styles.itemActions}>
                             <button 
@@ -163,7 +155,6 @@ const Cart = () => {
                 ))}
             </div>
 
-            {/* Order Summary */}
             <div style={styles.summaryCard}>
                 <h3>Order Summary</h3>
                 <div style={styles.summaryRow}>
@@ -185,7 +176,6 @@ const Cart = () => {
                 </div>
             </div>
 
-            {/* Payment Rules Info */}
             {paymentRules && (
                 <div style={styles.rulesCard}>
                     <h4>📋 Payment Rules</h4>
@@ -193,13 +183,9 @@ const Cart = () => {
                     {itemCount >= 4 && (
                         <p style={styles.warning}>⚠️ Online payment required for 4+ items</p>
                     )}
-                    {itemCount <= 3 && (
-                        <p style={styles.info}>ℹ️ You can pay 50% now and 50% on delivery</p>
-                    )}
                 </div>
             )}
 
-            {/* Action Buttons */}
             <div style={styles.actionButtons}>
                 <button onClick={handleClearCart} style={styles.clearBtn}>
                     Clear Cart
@@ -219,136 +205,126 @@ const styles = {
     container: {
         maxWidth: '1000px',
         margin: '0 auto',
-        padding: '20px',
+        padding: '1rem',
     },
     title: {
-        marginBottom: '30px',
-        color: '#2c3e50',
-        fontSize: '28px',
-        borderBottom: '2px solid #eee',
-        paddingBottom: '10px',
+        marginBottom: '1.5rem',
+        color: '#2d6a4f',
+        fontSize: '1.5rem',
+        borderBottom: '2px solid #d8f3dc',
+        paddingBottom: '0.5rem',
     },
     itemsContainer: {
-        border: '1px solid #ddd',
+        border: '1px solid #d8f3dc',
         borderRadius: '12px',
         overflow: 'hidden',
-        marginBottom: '20px',
+        marginBottom: '1rem',
     },
     cartItem: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '20px',
-        borderBottom: '1px solid #eee',
-        backgroundColor: 'white',
+        padding: '1rem',
+        borderBottom: '1px solid #d8f3dc',
+        backgroundColor: '#fffef7',
         flexWrap: 'wrap',
-        gap: '15px',
+        gap: '0.75rem',
     },
     itemDetails: {
         flex: 2,
     },
     itemPrice: {
-        fontSize: '12px',
-        color: '#666',
+        fontSize: '0.75rem',
+        color: '#52b788',
         marginTop: '4px',
-    },
-    customizations: {
-        fontSize: '11px',
-        color: '#888',
-        marginTop: '4px',
-        fontStyle: 'italic',
     },
     itemActions: {
         display: 'flex',
-        gap: '12px',
+        gap: '8px',
         alignItems: 'center',
         flexWrap: 'wrap',
     },
     qtyBtn: {
-        width: '32px',
-        height: '32px',
-        backgroundColor: '#3498db',
+        width: '28px',
+        height: '28px',
+        backgroundColor: '#2d6a4f',
         color: 'white',
         border: 'none',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        fontSize: '16px',
-        fontWeight: 'bold',
-    },
-    quantity: {
-        minWidth: '30px',
-        textAlign: 'center',
-        fontWeight: 'bold',
-        fontSize: '16px',
-    },
-    itemTotal: {
-        minWidth: '80px',
-        fontWeight: 'bold',
-        color: '#27ae60',
-        fontSize: '16px',
-    },
-    removeBtn: {
-        backgroundColor: '#e74c3c',
-        color: 'white',
-        border: 'none',
-        padding: '6px 12px',
         borderRadius: '6px',
         cursor: 'pointer',
         fontSize: '14px',
+        fontWeight: 'bold',
+    },
+    quantity: {
+        minWidth: '25px',
+        textAlign: 'center',
+        fontWeight: 'bold',
+        fontSize: '14px',
+    },
+    itemTotal: {
+        minWidth: '70px',
+        fontWeight: 'bold',
+        color: '#2d6a4f',
+        fontSize: '14px',
+    },
+    removeBtn: {
+        backgroundColor: '#d8f3dc',
+        color: '#2d6a4f',
+        border: 'none',
+        padding: '4px 10px',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '12px',
     },
     summaryCard: {
-        backgroundColor: 'white',
+        backgroundColor: '#fffef7',
         borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '20px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        padding: '1rem',
+        marginBottom: '1rem',
+        border: '1px solid #d8f3dc',
     },
     summaryRow: {
         display: 'flex',
         justifyContent: 'space-between',
-        padding: '8px 0',
+        padding: '6px 0',
         fontSize: '14px',
-        color: '#555',
+        color: '#52b788',
     },
     summaryRowTotal: {
         display: 'flex',
         justifyContent: 'space-between',
-        padding: '10px 0',
-        fontSize: '18px',
+        padding: '8px 0',
+        fontSize: '16px',
         fontWeight: 'bold',
-        color: '#2c3e50',
+        color: '#2d6a4f',
     },
     divider: {
         height: '1px',
-        backgroundColor: '#eee',
-        margin: '10px 0',
+        backgroundColor: '#d8f3dc',
+        margin: '8px 0',
     },
     rulesCard: {
-        backgroundColor: '#f0f7ff',
+        backgroundColor: '#d8f3dc',
         borderRadius: '12px',
-        padding: '15px',
-        marginBottom: '20px',
+        padding: '0.75rem',
+        marginBottom: '1rem',
     },
     warning: {
-        color: '#e74c3c',
+        color: '#2d6a4f',
         fontWeight: 'bold',
-        marginTop: '5px',
-        fontSize: '12px',
-    },
-    info: {
-        color: '#27ae60',
-        marginTop: '5px',
+        marginTop: '4px',
         fontSize: '12px',
     },
     actionButtons: {
         display: 'flex',
-        gap: '15px',
+        gap: '10px',
         justifyContent: 'flex-end',
+        flexWrap: 'wrap',
     },
     clearBtn: {
-        padding: '12px 24px',
-        backgroundColor: '#95a5a6',
-        color: 'white',
+        padding: '10px 20px',
+        backgroundColor: '#d8f3dc',
+        color: '#2d6a4f',
         border: 'none',
         borderRadius: '8px',
         cursor: 'pointer',
@@ -356,32 +332,32 @@ const styles = {
         fontWeight: 'bold',
     },
     checkoutBtn: {
-        padding: '12px 32px',
-        backgroundColor: '#27ae60',
+        padding: '10px 25px',
+        backgroundColor: '#2d6a4f',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
         cursor: 'pointer',
-        fontSize: '16px',
+        fontSize: '14px',
         fontWeight: 'bold',
     },
     emptyContainer: {
         textAlign: 'center',
-        padding: '60px',
+        padding: '40px 20px',
     },
     emptyIcon: {
-        fontSize: '60px',
-        marginBottom: '20px',
+        fontSize: '48px',
+        marginBottom: '15px',
     },
     browseBtn: {
-        marginTop: '20px',
-        padding: '12px 30px',
-        backgroundColor: '#3498db',
+        marginTop: '15px',
+        padding: '10px 25px',
+        backgroundColor: '#2d6a4f',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
         cursor: 'pointer',
-        fontSize: '16px',
+        fontSize: '14px',
     },
 };
 

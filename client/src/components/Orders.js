@@ -13,6 +13,7 @@ const Orders = () => {
     if (orders.length === 0) {
         return (
             <div style={styles.emptyContainer}>
+                <div style={styles.emptyIcon}>📦</div>
                 <h2>No Orders Yet</h2>
                 <p>Start ordering from your favorite cafes!</p>
                 <button onClick={() => window.location.href = '/'} style={styles.browseBtn}>
@@ -25,18 +26,18 @@ const Orders = () => {
     const getStatusColor = (status) => {
         switch (status?.toLowerCase()) {
             case 'pending': return '#f39c12';
-            case 'confirmed': return '#3498db';
-            case 'preparing': return '#9b59b6';
-            case 'ready': return '#1abc9c';
-            case 'delivered': return '#27ae60';
-            case 'cancelled': return '#e74c3c';
-            default: return '#95a5a6';
+            case 'confirmed': return '#2d6a4f';
+            case 'preparing': return '#52b788';
+            case 'ready': return '#1b4332';
+            case 'delivered': return '#2d6a4f';
+            case 'cancelled': return '#d8f3dc';
+            default: return '#74c69d';
         }
     };
 
     return (
         <div style={styles.container}>
-            <h2 style={styles.title}>My Orders</h2>
+            <h2 style={styles.title}>📋 My Orders</h2>
             <div style={styles.ordersList}>
                 {orders.map((order) => (
                     <div key={order.id} style={styles.orderCard}>
@@ -44,7 +45,8 @@ const Orders = () => {
                             <h3>Order #{order.order_number}</h3>
                             <span style={{
                                 ...styles.statusBadge,
-                                backgroundColor: getStatusColor(order.order_status)
+                                backgroundColor: getStatusColor(order.order_status),
+                                color: order.order_status?.toLowerCase() === 'cancelled' ? '#2d6a4f' : 'white'
                             }}>
                                 {order.order_status}
                             </span>
@@ -74,63 +76,72 @@ const styles = {
     container: {
         maxWidth: '800px',
         margin: '0 auto',
-        padding: '20px',
+        padding: '1rem',
     },
     title: {
-        marginBottom: '20px',
-        color: '#2c3e50',
+        marginBottom: '1.5rem',
+        color: '#2d6a4f',
+        fontSize: '1.5rem',
     },
     ordersList: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
+        gap: '1rem',
     },
     orderCard: {
-        backgroundColor: 'white',
-        borderRadius: '10px',
-        padding: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        backgroundColor: '#fffef7',
+        borderRadius: '12px',
+        padding: '1rem',
+        boxShadow: '0 2px 8px rgba(45, 106, 79, 0.1)',
+        border: '1px solid #d8f3dc',
     },
     orderHeader: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '15px',
-        paddingBottom: '10px',
-        borderBottom: '1px solid #eee',
+        marginBottom: '12px',
+        paddingBottom: '8px',
+        borderBottom: '1px solid #d8f3dc',
+        flexWrap: 'wrap',
+        gap: '8px',
     },
     statusBadge: {
-        padding: '5px 12px',
+        padding: '4px 10px',
         borderRadius: '20px',
-        fontSize: '12px',
+        fontSize: '11px',
         fontWeight: 'bold',
-        color: 'white',
     },
     orderDetails: {
-        marginBottom: '15px',
+        marginBottom: '12px',
+        fontSize: '14px',
     },
     itemsSection: {
-        marginTop: '10px',
-        paddingTop: '10px',
-        borderTop: '1px solid #eee',
+        marginTop: '8px',
+        paddingTop: '8px',
+        borderTop: '1px solid #d8f3dc',
     },
     orderItem: {
         display: 'flex',
         justifyContent: 'space-between',
-        padding: '5px 0',
+        padding: '4px 0',
+        fontSize: '13px',
     },
     browseBtn: {
-        marginTop: '20px',
+        marginTop: '15px',
         padding: '10px 25px',
-        backgroundColor: '#3498db',
+        backgroundColor: '#2d6a4f',
         color: 'white',
         border: 'none',
-        borderRadius: '5px',
+        borderRadius: '8px',
         cursor: 'pointer',
     },
     emptyContainer: {
         textAlign: 'center',
-        padding: '60px',
+        padding: '40px 20px',
+    },
+    emptyIcon: {
+        fontSize: '48px',
+        marginBottom: '15px',
     },
 };
 

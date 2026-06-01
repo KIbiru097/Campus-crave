@@ -6,12 +6,24 @@ const Home = () => {
     const { user } = useAuth();
     const [darkMode, setDarkMode] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const [featuredImages, setFeaturedImages] = useState({
+        cafe1: null,
+        cafe2: null,
+        cafe3: null,
+        cafe4: null
+    });
 
     // Load dark mode preference from localStorage
     useEffect(() => {
         const savedMode = localStorage.getItem('darkMode');
         if (savedMode) {
             setDarkMode(savedMode === 'true');
+        }
+        
+        // Load saved images from localStorage
+        const savedImages = localStorage.getItem('featuredImages');
+        if (savedImages) {
+            setFeaturedImages(JSON.parse(savedImages));
         }
     }, []);
 
@@ -24,6 +36,11 @@ const Home = () => {
             document.body.classList.remove('dark-mode');
         }
     }, [darkMode]);
+
+    // Save images to localStorage
+    useEffect(() => {
+        localStorage.setItem('featuredImages', JSON.stringify(featuredImages));
+    }, [featuredImages]);
 
     // Handle scroll effect
     useEffect(() => {
@@ -38,10 +55,35 @@ const Home = () => {
         setDarkMode(!darkMode);
     };
 
+    const handleImageUpload = (cafeKey, event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFeaturedImages(prev => ({
+                    ...prev,
+                    [cafeKey]: reader.result
+                }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const triggerFileInput = (cafeKey) => {
+        document.getElementById(`image-input-${cafeKey}`).click();
+    };
+
+    const featuredCafes = [
+        { id: 'cafe1', name: 'Campus Brew Cafe', description: 'Fresh coffee & pastries', defaultIcon: '☕', defaultImage: null },
+        { id: 'cafe2', name: 'Student Hub Diner', description: 'Burgers & fries', defaultIcon: '🍔', defaultImage: null },
+        { id: 'cafe3', name: 'Green Leaf Salad Bar', description: 'Healthy options', defaultIcon: '🥗', defaultImage: null },
+        { id: 'cafe4', name: 'Pizza Piazza', description: 'Authentic Italian pizza', defaultIcon: '🍕', defaultImage: null }
+    ];
+
     return (
         <div style={{ ...styles.container, ...(darkMode && styles.containerDark) }}>
             {/* Dark Mode Toggle Button */}
-            <button onClick={toggleDarkMode} style={styles.darkModeToggle}>
+            <button onClick={toggleDarkMode} style={{ ...styles.darkModeToggle, ...(darkMode && styles.darkModeToggleDark) }}>
                 {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
             </button>
 
@@ -49,7 +91,7 @@ const Home = () => {
             <div style={{ ...styles.hero, ...(darkMode && styles.heroDark) }}>
                 <div style={styles.waveContainer}>
                     <svg style={styles.wave} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
-                        <path fill={darkMode ? '#1a1a2e' : '#667eea'} fillOpacity="1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
+                        <path fill={darkMode ? '#2d1b0e' : '#FF6B35'} fillOpacity="1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
                     </svg>
                 </div>
                 
@@ -72,6 +114,8 @@ const Home = () => {
                                 onClick={() => window.location.href = '/register'} 
                                 style={styles.primaryBtn}
                                 className="hover-lift"
+                                onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
                             >
                                 Get Started ✨
                             </button>
@@ -79,6 +123,8 @@ const Home = () => {
                                 onClick={() => window.location.href = '/login'} 
                                 style={styles.secondaryBtn}
                                 className="hover-lift"
+                                onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
                             >
                                 Login 🔑
                             </button>
@@ -152,16 +198,52 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* Cafes Section */}
+            {/* Featured Cafes with Images Section */}
             <div style={{ ...styles.cafesSection, ...(darkMode && styles.cafesSectionDark) }}>
                 <h2 style={{ ...styles.sectionTitle, ...(darkMode && styles.sectionTitleDark) }}>✨ Featured Cafes</h2>
+                <div style={styles.featuredGrid}>
+                    {featuredCafes.map(cafe => (
+                        <div key={cafe.id} className="hover-lift" style={{ ...styles.featuredCard, ...(darkMode && styles.featuredCardDark) }}>
+                            <div style={styles.imageContainer}>
+                                {featuredImages[cafe.id] ? (
+                                    <img 
+                                        src={featuredImages[cafe.id]} 
+                                        alt={cafe.name}
+                                        style={styles.featuredImage}
+                                    />
+                                ) : (
+                                    <div style={styles.imagePlaceholder}>
+                                        <span style={styles.placeholderIcon}>{cafe.defaultIcon}</span>
+                                        <p style={styles.placeholderText}>Click to add image</p>
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    id={`image-input-${cafe.id}`}
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => handleImageUpload(cafe.id, e)}
+                                />
+                                <button 
+                                    onClick={() => triggerFileInput(cafe.id)}
+                                    style={styles.uploadButton}
+                                >
+                                    📷 Upload Image
+                                </button>
+                            </div>
+                            <h3 style={styles.featuredCardTitle}>{cafe.name}</h3>
+                            <p style={styles.featuredCardDesc}>{cafe.description}</p>
+                            <button style={styles.orderButton}>Order Now →</button>
+                        </div>
+                    ))}
+                </div>
                 <CafeList />
             </div>
 
             {/* Bottom Wave */}
             <div style={styles.bottomWave}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
-                    <path fill={darkMode ? '#1a1a2e' : '#667eea'} fillOpacity="1" d="M0,256L48,240C96,224,192,192,288,192C384,192,480,224,576,234.7C672,245,768,235,864,208C960,181,1056,139,1152,138.7C1248,139,1344,181,1392,202.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+                    <path fill={darkMode ? '#2d1b0e' : '#FF6B35'} fillOpacity="1" d="M0,256L48,240C96,224,192,192,288,192C384,192,480,224,576,234.7C672,245,768,235,864,208C960,181,1056,139,1152,138.7C1248,139,1344,181,1392,202.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
                 </svg>
             </div>
         </div>
@@ -183,7 +265,7 @@ const styles = {
         right: '20px',
         zIndex: 1000,
         padding: '10px 20px',
-        backgroundColor: '#2c3e50',
+        backgroundColor: '#FF6B35',
         color: 'white',
         border: 'none',
         borderRadius: '30px',
@@ -191,9 +273,12 @@ const styles = {
         boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
         transition: 'all 0.3s ease',
     },
+    darkModeToggleDark: {
+        backgroundColor: '#FF8C42',
+    },
     hero: {
         position: 'relative',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%)',
         minHeight: '500px',
         display: 'flex',
         alignItems: 'center',
@@ -201,7 +286,7 @@ const styles = {
         overflow: 'hidden',
     },
     heroDark: {
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        background: 'linear-gradient(135deg, #2d1b0e 0%, #4a2c15 100%)',
     },
     waveContainer: {
         position: 'absolute',
@@ -258,7 +343,7 @@ const styles = {
         padding: '12px 32px',
         fontSize: '1rem',
         background: 'white',
-        color: '#667eea',
+        color: '#FF6B35',
         border: 'none',
         borderRadius: '50px',
         cursor: 'pointer',
@@ -327,11 +412,11 @@ const styles = {
     statNumber: {
         fontSize: '32px',
         fontWeight: 'bold',
-        color: '#667eea',
+        color: '#FF6B35',
         marginBottom: '5px',
     },
     statNumberDark: {
-        color: '#9b59b6',
+        color: '#FF8C42',
     },
     statLabel: {
         fontSize: '14px',
@@ -385,6 +470,90 @@ const styles = {
     },
     cafesSectionDark: {
         backgroundColor: '#121212',
+    },
+    featuredGrid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gap: '30px',
+        maxWidth: '1200px',
+        margin: '0 auto 60px auto',
+    },
+    featuredCard: {
+        backgroundColor: 'white',
+        borderRadius: '20px',
+        overflow: 'hidden',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+        transition: 'all 0.3s ease',
+    },
+    featuredCardDark: {
+        backgroundColor: '#2d2d3d',
+        color: '#fff',
+    },
+    imageContainer: {
+        position: 'relative',
+        height: '200px',
+        backgroundColor: '#f0f0f0',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    featuredImage: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+    },
+    imagePlaceholder: {
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff5f0',
+    },
+    placeholderIcon: {
+        fontSize: '48px',
+        marginBottom: '10px',
+    },
+    placeholderText: {
+        fontSize: '14px',
+        color: '#999',
+    },
+    uploadButton: {
+        position: 'absolute',
+        bottom: '10px',
+        right: '10px',
+        padding: '8px 15px',
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        color: 'white',
+        border: 'none',
+        borderRadius: '20px',
+        cursor: 'pointer',
+        fontSize: '12px',
+        transition: 'all 0.3s ease',
+    },
+    featuredCardTitle: {
+        padding: '15px 15px 5px 15px',
+        fontSize: '18px',
+        margin: 0,
+    },
+    featuredCardDesc: {
+        padding: '0 15px 15px 15px',
+        fontSize: '14px',
+        color: '#666',
+    },
+    orderButton: {
+        margin: '0 15px 20px 15px',
+        padding: '10px 20px',
+        backgroundColor: '#FF6B35',
+        color: 'white',
+        border: 'none',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        width: 'calc(100% - 30px)',
+        transition: 'all 0.3s ease',
     },
     bottomWave: {
         marginTop: '-10px',

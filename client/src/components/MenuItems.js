@@ -63,7 +63,7 @@ const MenuItems = ({ cafeId }) => {
 
     return (
         <div style={styles.container}>
-            <h2 style={styles.title}>Menu</h2>
+            <h2 style={styles.title}>🍽️ Menu</h2>
             {message && <div style={styles.successMessage}>{message}</div>}
             <div style={styles.grid}>
                 {items.map((item) => (
@@ -87,7 +87,7 @@ const MenuItems = ({ cafeId }) => {
                                 onClick={() => handleAddToCart(item.id, item.price)}
                                 style={styles.addButton}
                             >
-                                Add to Cart
+                                Add
                             </button>
                         </div>
                     </div>
@@ -99,84 +99,90 @@ const MenuItems = ({ cafeId }) => {
 
 const styles = {
     container: {
-        padding: '20px',
+        padding: '1rem',
         maxWidth: '1200px',
         margin: '0 auto',
     },
     title: {
-        marginBottom: '30px',
-        color: '#2c3e50',
+        marginBottom: '1.5rem',
+        color: '#2d6a4f',
         textAlign: 'center',
+        fontSize: '1.5rem',
     },
     successMessage: {
-        backgroundColor: '#d4edda',
-        color: '#155724',
-        padding: '10px',
-        borderRadius: '5px',
-        marginBottom: '20px',
+        backgroundColor: '#d8f3dc',
+        color: '#2d6a4f',
+        padding: '0.75rem',
+        borderRadius: '8px',
+        marginBottom: '1rem',
         textAlign: 'center',
     },
     grid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-        gap: '24px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: '1rem',
     },
     card: {
-        backgroundColor: 'white',
+        backgroundColor: '#fffef7',
         borderRadius: '12px',
-        padding: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        padding: '1rem',
+        boxShadow: '0 2px 8px rgba(45, 106, 79, 0.1)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem',
     },
     itemInfo: {
-        flex: 1,
+        flex: 2,
     },
     itemName: {
-        marginBottom: '8px',
-        color: '#2c3e50',
+        marginBottom: '4px',
+        color: '#1b4332',
+        fontSize: '1rem',
     },
     description: {
-        color: '#666',
-        fontSize: '14px',
-        marginBottom: '8px',
+        color: '#52b788',
+        fontSize: '0.75rem',
+        marginBottom: '4px',
     },
     category: {
         display: 'inline-block',
-        backgroundColor: '#ecf0f1',
-        padding: '4px 8px',
+        backgroundColor: '#d8f3dc',
+        color: '#2d6a4f',
+        padding: '2px 8px',
         borderRadius: '4px',
-        fontSize: '12px',
-        marginBottom: '8px',
+        fontSize: '0.7rem',
+        marginBottom: '6px',
     },
     price: {
-        color: '#27ae60',
+        color: '#2d6a4f',
         fontWeight: 'bold',
-        fontSize: '18px',
-        marginTop: '8px',
+        fontSize: '1rem',
+        marginTop: '4px',
     },
     actions: {
         display: 'flex',
-        gap: '10px',
+        gap: '8px',
         alignItems: 'center',
-        marginLeft: '15px',
     },
     quantityInput: {
-        width: '60px',
-        padding: '8px',
-        border: '1px solid #ddd',
-        borderRadius: '5px',
+        width: '50px',
+        padding: '6px',
+        border: '1px solid #d8f3dc',
+        borderRadius: '6px',
         textAlign: 'center',
+        fontSize: '0.85rem',
     },
     addButton: {
-        padding: '8px 15px',
-        backgroundColor: '#3498db',
+        padding: '6px 12px',
+        backgroundColor: '#2d6a4f',
         color: 'white',
         border: 'none',
-        borderRadius: '5px',
+        borderRadius: '6px',
         cursor: 'pointer',
         fontWeight: 'bold',
+        fontSize: '0.85rem',
     },
 };
 
