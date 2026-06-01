@@ -185,7 +185,7 @@ const typeDefs = gql`
         institution: String!
         department: String
         year_of_study: Int
-        id_image_base64: String  # NEW: Base64 encoded image for OCR
+        id_image_base64: String
     }
 
     input LoginInput {
@@ -230,7 +230,7 @@ const typeDefs = gql`
 
     input CreateOrderInput {
         cafe_id: Int!
-        payment_type: String!  # 'ONLINE' or 'COD'
+        payment_type: String!
         special_instructions: String
         delivery_address: String
     }
@@ -265,6 +265,9 @@ const typeDefs = gql`
         # Cafe queries
         cafes(active_only: Boolean): [Cafe!]!
         cafe(id: ID!): Cafe
+        
+        # OWNER QUERIES - ADD THIS LINE
+        getMyCafes: [Cafe!]!
         
         # Menu queries
         menuItems(cafe_id: ID, category: String): [MenuItem!]!
