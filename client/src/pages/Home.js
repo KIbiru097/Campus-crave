@@ -1,250 +1,215 @@
 import React, { useState, useEffect } from 'react';
-import CafeList from '../components/CafeList';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@apollo/client';
+import { GET_MENU_ITEMS, GET_CAFES } from '../graphql/queries';
 import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
     const { user } = useAuth();
-    const [darkMode, setDarkMode] = useState(false);
     const [scrolled, setScrolled] = useState(false);
-    const [featuredImages, setFeaturedImages] = useState({
-        cafe1: null,
-        cafe2: null,
-        cafe3: null,
-        cafe4: null
+    const [popularItems, setPopularItems] = useState([]);
+
+    // Fetch cafes for stats
+    const { data: cafesData } = useQuery(GET_CAFES);
+    
+    // Fetch menu items for popular dishes
+    const { loading: menuLoading, data: menuData } = useQuery(GET_MENU_ITEMS, {
+        variables: { cafeId: null } // Get all menu items across cafes
     });
 
-    // Load dark mode preference from localStorage
     useEffect(() => {
-        const savedMode = localStorage.getItem('darkMode');
-        if (savedMode) {
-            setDarkMode(savedMode === 'true');
-        }
-        
-        // Load saved images from localStorage
-        const savedImages = localStorage.getItem('featuredImages');
-        if (savedImages) {
-            setFeaturedImages(JSON.parse(savedImages));
-        }
-    }, []);
-
-    // Save dark mode preference
-    useEffect(() => {
-        localStorage.setItem('darkMode', darkMode);
-        if (darkMode) {
-            document.body.classList.add('dark-mode');
-        } else {
-            document.body.classList.remove('dark-mode');
-        }
-    }, [darkMode]);
-
-    // Save images to localStorage
-    useEffect(() => {
-        localStorage.setItem('featuredImages', JSON.stringify(featuredImages));
-    }, [featuredImages]);
-
-    // Handle scroll effect
-    useEffect(() => {
-        const handleScroll = () => {
-            setScrolled(window.scrollY > 100);
-        };
+        const handleScroll = () => setScrolled(window.scrollY > 50);
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const toggleDarkMode = () => {
-        setDarkMode(!darkMode);
-    };
-
-    const handleImageUpload = (cafeKey, event) => {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFeaturedImages(prev => ({
-                    ...prev,
-                    [cafeKey]: reader.result
-                }));
-            };
-            reader.readAsDataURL(file);
+    // Get popular items (first 6 from menu)
+    useEffect(() => {
+        if (menuData?.menuItems) {
+            // Get unique items or first 6
+            const items = menuData.menuItems.slice(0, 6);
+            setPopularItems(items);
         }
-    };
+    }, [menuData]);
 
-    const triggerFileInput = (cafeKey) => {
-        document.getElementById(`image-input-${cafeKey}`).click();
-    };
+    const cafes = cafesData?.cafes || [];
+    const totalMenuItems = menuData?.menuItems?.length || 0;
 
-    const featuredCafes = [
-        { id: 'cafe1', name: 'Campus Brew Cafe', description: 'Fresh coffee & pastries', defaultIcon: '☕', defaultImage: null },
-        { id: 'cafe2', name: 'Student Hub Diner', description: 'Burgers & fries', defaultIcon: '🍔', defaultImage: null },
-        { id: 'cafe3', name: 'Green Leaf Salad Bar', description: 'Healthy options', defaultIcon: '🥗', defaultImage: null },
-        { id: 'cafe4', name: 'Pizza Piazza', description: 'Authentic Italian pizza', defaultIcon: '🍕', defaultImage: null }
-    ];
+    // Get food emoji based on category
+    const getFoodEmoji = (category) => {
+        const emojiMap = {
+            'Coffee': '☕',
+            'Beverages': '🥤',
+            'Burgers': '🍔',
+            'Sandwiches': '🥪',
+            'Pizza': '🍕',
+            'Pasta': '🍝',
+            'Salads': '🥗',
+            'Desserts': '🍰',
+            'Ethiopian': '🍛',
+            'Breakfast': '🍳',
+            'Lunch': '🍱',
+            'Main Dishes': '🍽️',
+        };
+        return emojiMap[category] || '🍽️';
+    };
 
     return (
-        <div style={{ ...styles.container, ...(darkMode && styles.containerDark) }}>
-            {/* Dark Mode Toggle Button */}
-            <button onClick={toggleDarkMode} style={{ ...styles.darkModeToggle, ...(darkMode && styles.darkModeToggleDark) }}>
-                {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
-            </button>
-
-            {/* Wave Hero Section */}
-            <div style={{ ...styles.hero, ...(darkMode && styles.heroDark) }}>
-                <div style={styles.waveContainer}>
-                    <svg style={styles.wave} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
-                        <path fill={darkMode ? '#2d1b0e' : '#FF6B35'} fillOpacity="1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,154.7C960,171,1056,181,1152,165.3C1248,149,1344,107,1392,85.3L1440,64L1440,0L1392,0C1344,0,1248,0,1152,0C1056,0,960,0,864,0C768,0,672,0,576,0C480,0,384,0,288,0C192,0,96,0,48,0L0,0Z"></path>
-                    </svg>
-                </div>
-                
-                <div className="animate-fadeIn" style={styles.heroContent}>
-                    <div style={styles.heroEmojiContainer}>
-                        <span style={styles.heroEmoji}>🍕</span>
-                        <span style={styles.heroEmoji}>☕</span>
-                        <span style={styles.heroEmoji}>🥗</span>
+        <div style={styles.container}>
+            {/* Hero Section */}
+            <div style={styles.hero}>
+                <div style={styles.heroContent}>
+                    <div style={styles.foodAnimation}>
+                        <span style={styles.flyingFood}>🍕</span>
+                        <span style={styles.flyingFood2}>🍔</span>
+                        <span style={styles.flyingFood3}>☕</span>
+                        <span style={styles.flyingFood4}>🥗</span>
                     </div>
-                    <h1 style={{ ...styles.heroTitle, ...(darkMode && styles.heroTitleDark) }}>
+                    <h1 style={styles.heroTitle}>
+                        <span style={styles.heroEmoji}>🍽️</span>
                         Campus Crave
+                        <span style={styles.heroEmoji}>✨</span>
                     </h1>
-                    <p style={{ ...styles.heroText, ...(darkMode && styles.heroTextDark) }}>
+                    <p style={styles.heroText}>
                         Your favorite campus cafes, now at your fingertips.
                         Order ahead, skip the line, and enjoy more time with friends.
                     </p>
                     {!user && (
                         <div style={styles.heroButtons}>
-                            <button 
-                                onClick={() => window.location.href = '/register'} 
-                                style={styles.primaryBtn}
-                                className="hover-lift"
-                                onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
-                                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-                            >
-                                Get Started ✨
-                            </button>
-                            <button 
-                                onClick={() => window.location.href = '/login'} 
-                                style={styles.secondaryBtn}
-                                className="hover-lift"
-                                onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
-                                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-                            >
-                                Login 🔑
-                            </button>
+                            <Link to="/register">
+                                <button style={styles.primaryBtn}>Get Started ✨</button>
+                            </Link>
+                            <Link to="/login">
+                                <button style={styles.secondaryBtn}>Login 🔑</button>
+                            </Link>
                         </div>
                     )}
                     {user && (
                         <div style={styles.welcomeBadge}>
                             <span>👋 Welcome back, {user.username}!</span>
+                            {user.role === 'admin' && (
+                                <Link to="/admin">
+                                    <button style={styles.adminBtn}>Admin Dashboard</button>
+                                </Link>
+                            )}
+                            {(user.role === 'owner' || user.role === 'staff') && (
+                                <Link to="/cafe-management">
+                                    <button style={styles.ownerBtn}>Manage Cafe</button>
+                                </Link>
+                            )}
                         </div>
                     )}
-                </div>
-                
-                {/* Floating Food Icons */}
-                <div style={styles.floatingIcons}>
-                    <div className="floating-icon" style={{ ...styles.floatingIcon, top: '20%', left: '10%', animationDelay: '0s' }}>🍔</div>
-                    <div className="floating-icon" style={{ ...styles.floatingIcon, top: '60%', left: '85%', animationDelay: '1s' }}>🍟</div>
-                    <div className="floating-icon" style={{ ...styles.floatingIcon, top: '70%', left: '15%', animationDelay: '2s' }}>🥤</div>
-                    <div className="floating-icon" style={{ ...styles.floatingIcon, top: '30%', left: '75%', animationDelay: '0.5s' }}>🍩</div>
-                    <div className="floating-icon" style={{ ...styles.floatingIcon, top: '80%', left: '50%', animationDelay: '1.5s' }}>🌮</div>
                 </div>
             </div>
 
             {/* Stats Section */}
-            <div style={{ ...styles.statsSection, ...(darkMode && styles.statsSectionDark) }}>
-                <div className="animate-slideInLeft" style={styles.stat}>
+            <div style={styles.statsSection}>
+                <div style={styles.stat}>
                     <div style={styles.statIcon}>🏪</div>
-                    <h3 style={{ ...styles.statNumber, ...(darkMode && styles.statNumberDark) }}>12+</h3>
-                    <p style={{ ...styles.statLabel, ...(darkMode && styles.statLabelDark) }}>Campus Cafes</p>
+                    <h3>{cafes.length}+</h3>
+                    <p>Campus Cafes</p>
                 </div>
-                <div className="animate-slideInLeft" style={{ ...styles.stat, animationDelay: '0.2s' }}>
+                <div style={styles.stat}>
                     <div style={styles.statIcon}>🍽️</div>
-                    <h3 style={{ ...styles.statNumber, ...(darkMode && styles.statNumberDark) }}>50+</h3>
-                    <p style={{ ...styles.statLabel, ...(darkMode && styles.statLabelDark) }}>Menu Items</p>
+                    <h3>{totalMenuItems}+</h3>
+                    <p>Menu Items</p>
                 </div>
-                <div className="animate-slideInLeft" style={{ ...styles.stat, animationDelay: '0.4s' }}>
+                <div style={styles.stat}>
                     <div style={styles.statIcon}>👨‍🎓</div>
-                    <h3 style={{ ...styles.statNumber, ...(darkMode && styles.statNumberDark) }}>1000+</h3>
-                    <p style={{ ...styles.statLabel, ...(darkMode && styles.statLabelDark) }}>Happy Students</p>
+                    <h3>1000+</h3>
+                    <p>Happy Students</p>
                 </div>
-                <div className="animate-slideInLeft" style={{ ...styles.stat, animationDelay: '0.6s' }}>
+                <div style={styles.stat}>
                     <div style={styles.statIcon}>⭐</div>
-                    <h3 style={{ ...styles.statNumber, ...(darkMode && styles.statNumberDark) }}>4.8</h3>
-                    <p style={{ ...styles.statLabel, ...(darkMode && styles.statLabelDark) }}>Rating</p>
+                    <h3>4.8</h3>
+                    <p>Rating</p>
                 </div>
+            </div>
+
+            {/* Popular Dishes Section - Fetched from Database */}
+            <div style={styles.featuredSection}>
+                <h2 style={styles.sectionTitle}>🔥 Popular Dishes</h2>
+                {menuLoading ? (
+                    <div style={styles.loadingContainer}>
+                        <div className="skeleton" style={{ width: '100%', height: '200px', borderRadius: '16px' }}></div>
+                    </div>
+                ) : (
+                    <div style={styles.featuredGrid}>
+                        {popularItems.map((item, index) => (
+                            <div key={item.id} style={styles.featuredCard}>
+                                <div style={styles.foodImage}>{getFoodEmoji(item.category)}</div>
+                                <h4>{item.name}</h4>
+                                <p>{item.category}</p>
+                                <span style={styles.foodPrice}>ETB {item.price}</span>
+                                <Link to={`/cafe/${item.cafe_id}`}>
+                                    <button style={styles.orderBtn}>Order Now →</button>
+                                </Link>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Features Section */}
-            <div style={{ ...styles.featuresSection, ...(darkMode && styles.featuresSectionDark) }}>
-                <h2 style={{ ...styles.sectionTitle, ...(darkMode && styles.sectionTitleDark) }}>Why Choose Campus Crave?</h2>
+            <div style={styles.featuresSection}>
+                <h2 style={styles.sectionTitle}>Why Choose Campus Crave?</h2>
                 <div style={styles.featuresGrid}>
-                    <div className="hover-lift" style={{ ...styles.featureCard, ...(darkMode && styles.featureCardDark) }}>
+                    <div style={styles.featureCard}>
                         <div style={styles.featureIcon}>⚡</div>
                         <h4>Fast Delivery</h4>
-                        <p>Get your food delivered within 30 minutes</p>
+                        <p>Get your food within 30 minutes</p>
                     </div>
-                    <div className="hover-lift" style={{ ...styles.featureCard, ...(darkMode && styles.featureCardDark) }}>
+                    <div style={styles.featureCard}>
                         <div style={styles.featureIcon}>💳</div>
                         <h4>Easy Payment</h4>
-                        <p>Online or Cash on Delivery options available</p>
+                        <p>Online or Cash on Delivery</p>
                     </div>
-                    <div className="hover-lift" style={{ ...styles.featureCard, ...(darkMode && styles.featureCardDark) }}>
+                    <div style={styles.featureCard}>
                         <div style={styles.featureIcon}>📍</div>
                         <h4>Real-time Tracking</h4>
-                        <p>Track your order from cafe to your doorstep</p>
+                        <p>Track your order live</p>
                     </div>
-                    <div className="hover-lift" style={{ ...styles.featureCard, ...(darkMode && styles.featureCardDark) }}>
+                    <div style={styles.featureCard}>
                         <div style={styles.featureIcon}>🎁</div>
                         <h4>Student Discounts</h4>
-                        <p>Special offers and discounts for students</p>
+                        <p>Special offers for students</p>
                     </div>
                 </div>
             </div>
 
-            {/* Featured Cafes with Images Section */}
-            <div style={{ ...styles.cafesSection, ...(darkMode && styles.cafesSectionDark) }}>
-                <h2 style={{ ...styles.sectionTitle, ...(darkMode && styles.sectionTitleDark) }}>✨ Featured Cafes</h2>
-                <div style={styles.featuredGrid}>
-                    {featuredCafes.map(cafe => (
-                        <div key={cafe.id} className="hover-lift" style={{ ...styles.featuredCard, ...(darkMode && styles.featuredCardDark) }}>
-                            <div style={styles.imageContainer}>
-                                {featuredImages[cafe.id] ? (
-                                    <img 
-                                        src={featuredImages[cafe.id]} 
-                                        alt={cafe.name}
-                                        style={styles.featuredImage}
-                                    />
-                                ) : (
-                                    <div style={styles.imagePlaceholder}>
-                                        <span style={styles.placeholderIcon}>{cafe.defaultIcon}</span>
-                                        <p style={styles.placeholderText}>Click to add image</p>
-                                    </div>
-                                )}
-                                <input
-                                    type="file"
-                                    id={`image-input-${cafe.id}`}
-                                    accept="image/*"
-                                    style={{ display: 'none' }}
-                                    onChange={(e) => handleImageUpload(cafe.id, e)}
-                                />
-                                <button 
-                                    onClick={() => triggerFileInput(cafe.id)}
-                                    style={styles.uploadButton}
-                                >
-                                    📷 Upload Image
-                                </button>
+            {/* Cafes Section */}
+            <div style={styles.cafesSection}>
+                <h2 style={styles.sectionTitle}>📍 Our Cafes</h2>
+                <div style={styles.cafesGrid}>
+                    {cafes.slice(0, 4).map((cafe) => (
+                        <Link to={`/cafe/${cafe.id}`} key={cafe.id} style={styles.cafeCardLink}>
+                            <div style={styles.cafeCard}>
+                                <div style={styles.cafeIcon}>🏪</div>
+                                <h4>{cafe.name}</h4>
+                                <p>{cafe.location}</p>
+                                <span style={styles.cafeStatus}>
+                                    {cafe.is_active ? '🟢 Open' : '🔴 Closed'}
+                                </span>
                             </div>
-                            <h3 style={styles.featuredCardTitle}>{cafe.name}</h3>
-                            <p style={styles.featuredCardDesc}>{cafe.description}</p>
-                            <button style={styles.orderButton}>Order Now →</button>
-                        </div>
+                        </Link>
                     ))}
                 </div>
-                <CafeList />
+                <div style={styles.viewAll}>
+                    <Link to="/">
+                        <button style={styles.viewAllBtn}>View All Cafes →</button>
+                    </Link>
+                </div>
             </div>
 
-            {/* Bottom Wave */}
-            <div style={styles.bottomWave}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
-                    <path fill={darkMode ? '#2d1b0e' : '#FF6B35'} fillOpacity="1" d="M0,256L48,240C96,224,192,192,288,192C384,192,480,224,576,234.7C672,245,768,235,864,208C960,181,1056,139,1152,138.7C1248,139,1344,181,1392,202.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
-                </svg>
+            {/* Call to Action */}
+            <div style={styles.ctaSection}>
+                <h2>Ready to Crave?</h2>
+                <p>Join thousands of students enjoying delicious meals from campus cafes</p>
+                {!user && (
+                    <Link to="/register">
+                        <button style={styles.ctaBtn}>Sign Up Now</button>
+                    </Link>
+                )}
             </div>
         </div>
     );
@@ -253,212 +218,212 @@ const Home = () => {
 const styles = {
     container: {
         minHeight: '100vh',
-        backgroundColor: '#f5f7fa',
-        transition: 'all 0.3s ease',
-    },
-    containerDark: {
-        backgroundColor: '#121212',
-    },
-    darkModeToggle: {
-        position: 'fixed',
-        top: '80px',
-        right: '20px',
-        zIndex: 1000,
-        padding: '10px 20px',
-        backgroundColor: '#FF6B35',
-        color: 'white',
-        border: 'none',
-        borderRadius: '30px',
-        cursor: 'pointer',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-        transition: 'all 0.3s ease',
-    },
-    darkModeToggleDark: {
-        backgroundColor: '#FF8C42',
+        backgroundColor: '#fffef7',
     },
     hero: {
+        background: 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)',
+        padding: '80px 20px',
         position: 'relative',
-        background: 'linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%)',
-        minHeight: '500px',
+        overflow: 'hidden',
+    },
+    heroContent: {
+        maxWidth: '800px',
+        margin: '0 auto',
+        textAlign: 'center',
+        position: 'relative',
+        zIndex: 2,
+    },
+    foodAnimation: {
+        position: 'relative',
+        height: '100px',
+        marginBottom: '20px',
+    },
+    flyingFood: {
+        position: 'absolute',
+        fontSize: '45px',
+        animation: 'float 3s ease-in-out infinite',
+        left: '10%',
+        top: '0',
+    },
+    flyingFood2: {
+        position: 'absolute',
+        fontSize: '40px',
+        animation: 'float 4s ease-in-out infinite 0.5s',
+        right: '10%',
+        top: '20px',
+    },
+    flyingFood3: {
+        position: 'absolute',
+        fontSize: '35px',
+        animation: 'float 3.5s ease-in-out infinite 1s',
+        left: '30%',
+        bottom: '0',
+    },
+    flyingFood4: {
+        position: 'absolute',
+        fontSize: '38px',
+        animation: 'float 4.5s ease-in-out infinite 1.5s',
+        right: '25%',
+        top: '50px',
+    },
+    heroTitle: {
+        fontSize: '48px',
+        fontWeight: 'bold',
+        color: 'white',
+        marginBottom: '20px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        overflow: 'hidden',
-    },
-    heroDark: {
-        background: 'linear-gradient(135deg, #2d1b0e 0%, #4a2c15 100%)',
-    },
-    waveContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-    },
-    wave: {
-        width: '100%',
-        height: 'auto',
-    },
-    heroContent: {
-        textAlign: 'center',
-        color: 'white',
-        zIndex: 2,
-        maxWidth: '800px',
-        padding: '20px',
-    },
-    heroEmojiContainer: {
-        display: 'flex',
-        justifyContent: 'center',
-        gap: '20px',
-        marginBottom: '20px',
+        gap: '15px',
+        flexWrap: 'wrap',
     },
     heroEmoji: {
         fontSize: '48px',
-        animation: 'bounce 2s infinite',
-    },
-    heroTitle: {
-        fontSize: '3.5rem',
-        fontWeight: 'bold',
-        marginBottom: '1rem',
-        textShadow: '2px 2px 4px rgba(0,0,0,0.2)',
-    },
-    heroTitleDark: {
-        color: '#fff',
     },
     heroText: {
-        fontSize: '1.2rem',
-        opacity: 0.95,
-        lineHeight: 1.6,
-        marginBottom: '2rem',
-    },
-    heroTextDark: {
-        color: '#ccc',
+        fontSize: '18px',
+        color: 'rgba(255,255,255,0.9)',
+        marginBottom: '30px',
+        lineHeight: '1.6',
     },
     heroButtons: {
         display: 'flex',
-        gap: '1rem',
+        gap: '15px',
         justifyContent: 'center',
         flexWrap: 'wrap',
     },
     primaryBtn: {
         padding: '12px 32px',
-        fontSize: '1rem',
+        fontSize: '16px',
         background: 'white',
-        color: '#FF6B35',
+        color: '#2d6a4f',
         border: 'none',
         borderRadius: '50px',
         cursor: 'pointer',
         fontWeight: 'bold',
-        transition: 'all 0.3s ease',
     },
     secondaryBtn: {
         padding: '12px 32px',
-        fontSize: '1rem',
+        fontSize: '16px',
         background: 'transparent',
         color: 'white',
         border: '2px solid white',
         borderRadius: '50px',
         cursor: 'pointer',
         fontWeight: 'bold',
-        transition: 'all 0.3s ease',
+    },
+    adminBtn: {
+        padding: '8px 20px',
+        fontSize: '14px',
+        background: '#f39c12',
+        color: 'white',
+        border: 'none',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        marginLeft: '15px',
+    },
+    ownerBtn: {
+        padding: '8px 20px',
+        fontSize: '14px',
+        background: '#3498db',
+        color: 'white',
+        border: 'none',
+        borderRadius: '25px',
+        cursor: 'pointer',
+        marginLeft: '15px',
     },
     welcomeBadge: {
-        display: 'inline-block',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        padding: '10px 20px',
-        borderRadius: '30px',
         marginTop: '20px',
-    },
-    floatingIcons: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        pointerEvents: 'none',
-    },
-    floatingIcon: {
-        position: 'absolute',
-        fontSize: '30px',
-        opacity: 0.6,
-        animation: 'float 6s ease-in-out infinite',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '10px',
     },
     statsSection: {
         display: 'flex',
         justifyContent: 'space-around',
         flexWrap: 'wrap',
         padding: '40px 20px',
-        backgroundColor: 'white',
-        marginTop: '-50px',
-        position: 'relative',
-        zIndex: 10,
-        borderRadius: '30px',
+        backgroundColor: '#d8f3dc',
+        marginTop: '-30px',
         marginLeft: '20px',
         marginRight: '20px',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-    },
-    statsSectionDark: {
-        backgroundColor: '#1e1e2e',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+        borderRadius: '30px',
     },
     stat: {
         textAlign: 'center',
-        padding: '20px',
-        minWidth: '150px',
+        minWidth: '120px',
+        padding: '15px',
     },
     statIcon: {
         fontSize: '40px',
         marginBottom: '10px',
     },
-    statNumber: {
-        fontSize: '32px',
-        fontWeight: 'bold',
-        color: '#FF6B35',
-        marginBottom: '5px',
-    },
-    statNumberDark: {
-        color: '#FF8C42',
-    },
-    statLabel: {
-        fontSize: '14px',
-        color: '#666',
-    },
-    statLabelDark: {
-        color: '#aaa',
-    },
-    featuresSection: {
+    featuredSection: {
         padding: '60px 20px',
-        backgroundColor: '#f8f9fa',
-    },
-    featuresSectionDark: {
-        backgroundColor: '#1a1a2e',
     },
     sectionTitle: {
         textAlign: 'center',
         fontSize: '32px',
+        color: '#2d6a4f',
         marginBottom: '40px',
-        color: '#2c3e50',
     },
-    sectionTitleDark: {
-        color: '#fff',
+    featuredGrid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '25px',
+        maxWidth: '1200px',
+        margin: '0 auto',
+    },
+    featuredCard: {
+        backgroundColor: 'white',
+        borderRadius: '20px',
+        padding: '20px',
+        textAlign: 'center',
+        boxShadow: '0 5px 20px rgba(45,106,79,0.1)',
+        transition: 'transform 0.3s',
+    },
+    foodImage: {
+        fontSize: '60px',
+        marginBottom: '15px',
+    },
+    foodPrice: {
+        display: 'inline-block',
+        marginTop: '10px',
+        padding: '5px 15px',
+        backgroundColor: '#d8f3dc',
+        color: '#2d6a4f',
+        borderRadius: '20px',
+        fontWeight: 'bold',
+    },
+    orderBtn: {
+        marginTop: '12px',
+        padding: '6px 16px',
+        backgroundColor: '#2d6a4f',
+        color: 'white',
+        border: 'none',
+        borderRadius: '20px',
+        cursor: 'pointer',
+        fontSize: '12px',
+    },
+    featuresSection: {
+        padding: '60px 20px',
+        backgroundColor: '#f0fdf4',
     },
     featuresGrid: {
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
         gap: '30px',
-        maxWidth: '1200px',
+        maxWidth: '1000px',
         margin: '0 auto',
     },
     featureCard: {
         textAlign: 'center',
-        padding: '30px',
+        padding: '25px',
         backgroundColor: 'white',
         borderRadius: '20px',
-        boxShadow: '0 5px 20px rgba(0,0,0,0.05)',
-        transition: 'all 0.3s ease',
-    },
-    featureCardDark: {
-        backgroundColor: '#2d2d3d',
-        color: '#fff',
+        boxShadow: '0 5px 15px rgba(0,0,0,0.05)',
     },
     featureIcon: {
         fontSize: '48px',
@@ -466,164 +431,88 @@ const styles = {
     },
     cafesSection: {
         padding: '60px 20px',
-        backgroundColor: '#f5f7fa',
     },
-    cafesSectionDark: {
-        backgroundColor: '#121212',
-    },
-    featuredGrid: {
+    cafesGrid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '30px',
-        maxWidth: '1200px',
-        margin: '0 auto 60px auto',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '25px',
+        maxWidth: '1000px',
+        margin: '0 auto',
     },
-    featuredCard: {
+    cafeCardLink: {
+        textDecoration: 'none',
+        color: 'inherit',
+    },
+    cafeCard: {
         backgroundColor: 'white',
-        borderRadius: '20px',
-        overflow: 'hidden',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-        transition: 'all 0.3s ease',
+        borderRadius: '16px',
+        padding: '20px',
+        textAlign: 'center',
+        border: '1px solid #d8f3dc',
+        transition: 'transform 0.3s',
     },
-    featuredCardDark: {
-        backgroundColor: '#2d2d3d',
-        color: '#fff',
-    },
-    imageContainer: {
-        position: 'relative',
-        height: '200px',
-        backgroundColor: '#f0f0f0',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    featuredImage: {
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover',
-    },
-    imagePlaceholder: {
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff5f0',
-    },
-    placeholderIcon: {
+    cafeIcon: {
         fontSize: '48px',
         marginBottom: '10px',
     },
-    placeholderText: {
-        fontSize: '14px',
-        color: '#999',
-    },
-    uploadButton: {
-        position: 'absolute',
-        bottom: '10px',
-        right: '10px',
-        padding: '8px 15px',
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        color: 'white',
-        border: 'none',
-        borderRadius: '20px',
-        cursor: 'pointer',
+    cafeStatus: {
+        display: 'inline-block',
+        marginTop: '10px',
         fontSize: '12px',
-        transition: 'all 0.3s ease',
+        fontWeight: 'bold',
     },
-    featuredCardTitle: {
-        padding: '15px 15px 5px 15px',
-        fontSize: '18px',
-        margin: 0,
+    viewAll: {
+        textAlign: 'center',
+        marginTop: '30px',
     },
-    featuredCardDesc: {
-        padding: '0 15px 15px 15px',
+    viewAllBtn: {
+        padding: '10px 30px',
+        backgroundColor: 'transparent',
+        border: '2px solid #2d6a4f',
+        color: '#2d6a4f',
+        borderRadius: '30px',
+        cursor: 'pointer',
         fontSize: '14px',
-        color: '#666',
+        fontWeight: 'bold',
     },
-    orderButton: {
-        margin: '0 15px 20px 15px',
-        padding: '10px 20px',
-        backgroundColor: '#FF6B35',
+    ctaSection: {
+        textAlign: 'center',
+        padding: '60px 20px',
+        background: 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)',
         color: 'white',
+    },
+    ctaBtn: {
+        marginTop: '20px',
+        padding: '12px 32px',
+        fontSize: '16px',
+        background: 'white',
+        color: '#2d6a4f',
         border: 'none',
-        borderRadius: '25px',
+        borderRadius: '50px',
         cursor: 'pointer',
         fontWeight: 'bold',
-        width: 'calc(100% - 30px)',
-        transition: 'all 0.3s ease',
     },
-    bottomWave: {
-        marginTop: '-10px',
+    loadingContainer: {
+        padding: '40px',
+        textAlign: 'center',
     },
 };
 
-// Add keyframe animations to document
+// Add animations
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
     @keyframes float {
         0%, 100% { transform: translateY(0px); }
         50% { transform: translateY(-20px); }
     }
-    
-    @keyframes bounce {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
+    .skeleton {
+        background: linear-gradient(90deg, #d8f3dc 25%, #fffef7 50%, #d8f3dc 75%);
+        background-size: 1000px 100%;
+        animation: shimmer 2s infinite;
     }
-    
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    @keyframes slideInLeft {
-        from {
-            opacity: 0;
-            transform: translateX(-30px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-    
-    .animate-fadeIn {
-        animation: fadeIn 0.8s ease-out;
-    }
-    
-    .animate-slideInLeft {
-        animation: slideInLeft 0.6s ease-out forwards;
-        opacity: 0;
-    }
-    
-    .animate-slideInLeft:nth-child(1) { animation-delay: 0s; }
-    .animate-slideInLeft:nth-child(2) { animation-delay: 0.2s; }
-    .animate-slideInLeft:nth-child(3) { animation-delay: 0.4s; }
-    .animate-slideInLeft:nth-child(4) { animation-delay: 0.6s; }
-    
-    .hover-lift {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    .hover-lift:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-    }
-    
-    .floating-icon {
-        animation: float 6s ease-in-out infinite;
-    }
-    
-    body.dark-mode {
-        background-color: #121212;
+    @keyframes shimmer {
+        0% { background-position: -1000px 0; }
+        100% { background-position: 1000px 0; }
     }
 `;
 document.head.appendChild(styleSheet);

@@ -12,7 +12,6 @@ export const GET_CAFES = gql`
         }
     }
 `;
-
 export const GET_MENU_ITEMS = gql`
     query GetMenuItems($cafeId: ID) {
         menuItems(cafe_id: $cafeId) {
@@ -22,10 +21,10 @@ export const GET_MENU_ITEMS = gql`
             price
             category
             status
+            cafe_id
         }
     }
 `;
-
 export const GET_CART = gql`
     query GetCart {
         myCart {
