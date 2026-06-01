@@ -1,7 +1,6 @@
 import { gql } from '@apollo/client';
 
-// ==================== AUTH MUTATIONS ====================
-
+// Auth Mutations
 export const LOGIN_USER = gql`
     mutation Login($input: LoginInput!) {
         login(input: $input) {
@@ -30,8 +29,20 @@ export const REGISTER_USER = gql`
     }
 `;
 
-// ==================== CART MUTATIONS ====================
+// Staff Management (Admin only)
+export const CREATE_STAFF = gql`
+    mutation CreateStaff($input: CreateStaffInput!) {
+        createStaff(input: $input) {
+            id
+            username
+            email
+            phone
+            role
+        }
+    }
+`;
 
+// Cart Mutations
 export const ADD_TO_CART = gql`
     mutation AddToCart($input: AddToCartInput!) {
         addToCart(input: $input) {
@@ -78,8 +89,7 @@ export const CLEAR_CART = gql`
     }
 `;
 
-// ==================== ORDER MUTATIONS ====================
-
+// Order Mutations
 export const CREATE_ORDER = gql`
     mutation CreateOrder($input: CreateOrderInput!) {
         createOrder(input: $input) {
@@ -112,8 +122,7 @@ export const CANCEL_ORDER = gql`
     }
 `;
 
-// ==================== CAFE MANAGEMENT MUTATIONS (Admin) ====================
-
+// Cafe Management (Admin only)
 export const CREATE_CAFE = gql`
     mutation CreateCafe($input: CreateCafeInput!) {
         createCafe(input: $input) {
@@ -127,9 +136,9 @@ export const CREATE_CAFE = gql`
     }
 `;
 
-export const REGISTER_CAFE = gql`
-    mutation RegisterCafe($input: CreateCafeInput!) {
-        registerCafe(input: $input) {
+export const UPDATE_CAFE = gql`
+    mutation UpdateCafe($id: ID!, $input: UpdateCafeInput!) {
+        updateCafe(id: $id, input: $input) {
             id
             name
             description
@@ -140,39 +149,13 @@ export const REGISTER_CAFE = gql`
     }
 `;
 
-export const ASSIGN_CAFE_OWNER = gql`
-    mutation AssignCafeOwner($cafeId: ID!, $userId: ID!) {
-        assignCafeOwner(cafe_id: $cafeId, user_id: $userId) {
-            id
-            user_id
-            cafe_id
-            position
-        }
+export const DELETE_CAFE = gql`
+    mutation DeleteCafe($id: ID!) {
+        deleteCafe(id: $id)
     }
 `;
 
-export const SOFT_DELETE_CAFE = gql`
-    mutation SoftDeleteCafe($id: ID!) {
-        softDeleteCafe(id: $id) {
-            id
-            name
-            deleted_at
-        }
-    }
-`;
-
-export const RESTORE_CAFE = gql`
-    mutation RestoreCafe($id: ID!) {
-        restoreCafe(id: $id) {
-            id
-            name
-            deleted_at
-        }
-    }
-`;
-
-// ==================== MENU MANAGEMENT MUTATIONS ====================
-
+// Menu Item Mutations
 export const CREATE_MENU_ITEM = gql`
     mutation CreateMenuItem($input: CreateMenuItemInput!) {
         createMenuItem(input: $input) {
@@ -199,6 +182,33 @@ export const UPDATE_MENU_ITEM = gql`
     }
 `;
 
+export const DELETE_MENU_ITEM = gql`
+    mutation DeleteMenuItem($id: ID!) {
+        deleteMenuItem(id: $id)
+    }
+`;
+
+// Admin Soft Delete Mutations
+export const SOFT_DELETE_CAFE = gql`
+    mutation SoftDeleteCafe($id: ID!) {
+        softDeleteCafe(id: $id) {
+            id
+            name
+            deleted_at
+        }
+    }
+`;
+
+export const RESTORE_CAFE = gql`
+    mutation RestoreCafe($id: ID!) {
+        restoreCafe(id: $id) {
+            id
+            name
+            deleted_at
+        }
+    }
+`;
+
 export const SOFT_DELETE_MENU_ITEM = gql`
     mutation SoftDeleteMenuItem($id: ID!) {
         softDeleteMenuItem(id: $id) {
@@ -219,8 +229,7 @@ export const RESTORE_MENU_ITEM = gql`
     }
 `;
 
-// ==================== DELIVERY MUTATIONS ====================
-
+// Delivery Mutations
 export const ASSIGN_DELIVERY = gql`
     mutation AssignDelivery($orderId: ID!, $deliveryPersonId: ID!) {
         assignDelivery(order_id: $orderId, delivery_person_id: $deliveryPersonId) {
