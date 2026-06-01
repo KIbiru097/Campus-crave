@@ -23,6 +23,18 @@ const ProtectedRoute = ({ children }) => {
     return user ? children : <Navigate to="/login" />;
 };
 
+// Admin only route
+const AdminRoute = ({ children }) => {
+    const { user } = useAuth();
+    return user && user.role === 'admin' ? children : <Navigate to="/" />;
+};
+
+// Owner only route
+const OwnerRoute = ({ children }) => {
+    const { user } = useAuth();
+    return user && (user.role === 'owner' || user.role === 'staff') ? children : <Navigate to="/" />;
+};
+
 // Main App Content
 function AppContent() {
     return (
@@ -34,44 +46,15 @@ function AppContent() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/cafe/:cafeId" element={<MenuPage />} />
-                    <Route path="/cart" element={
-                        <ProtectedRoute>
-                            <CartPage />
-                        </ProtectedRoute>
-                    } />
-                    <Route path="/checkout" element={
-                        <ProtectedRoute>
-                            <CheckoutPage />
-                        </ProtectedRoute>
-                    } />
-                    <Route path="/payment" element={
-                        <ProtectedRoute>
-                            <PaymentPage />
-                        </ProtectedRoute>
-                    } />
-                    <Route path="/orders" element={
-                        <ProtectedRoute>
-                            <OrdersPage />
-                        </ProtectedRoute>
-                    } />
-                    <Route path="/profile" element={
-                        <ProtectedRoute>
-                            <ProfilePage />
-                        </ProtectedRoute>
-                    } />
-                    <Route path="/mock-payment" element={
-                        <ProtectedRoute>
-                            <MockPayment />
-                        </ProtectedRoute>
-                    } />
-                    <Route path="/payment/success" element={
-                        <ProtectedRoute>
-                            <MockPayment />
-                        </ProtectedRoute>
-                    } />
-                    // Add these routes
-<Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-<Route path="/cafe-management" element={<ProtectedRoute><CafeManagement /></ProtectedRoute>} />
+                    <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+                    <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+                    <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
+                    <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+                    <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                    <Route path="/mock-payment" element={<ProtectedRoute><MockPayment /></ProtectedRoute>} />
+                    <Route path="/payment/success" element={<ProtectedRoute><MockPayment /></ProtectedRoute>} />
+                    <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                    <Route path="/cafe-management" element={<OwnerRoute><CafeManagement /></OwnerRoute>} />
                 </Routes>
             </div>
         </>
