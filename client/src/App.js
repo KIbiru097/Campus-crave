@@ -14,6 +14,8 @@ import ProfilePage from './pages/ProfilePage';
 import CheckoutPage from './pages/CheckoutPage';
 import PaymentPage from './pages/PaymentPage';
 import MockPayment from './components/MockPayment';
+import AdminDashboard from './pages/AdminDashboard';
+import CafeManagement from './pages/CafeManagement';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -67,6 +69,9 @@ function AppContent() {
                             <MockPayment />
                         </ProtectedRoute>
                     } />
+                    // Add these routes
+<Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+<Route path="/cafe-management" element={<ProtectedRoute><CafeManagement /></ProtectedRoute>} />
                 </Routes>
             </div>
         </>
