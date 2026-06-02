@@ -760,7 +760,7 @@ const resolvers = {
             }
         },
         
-        // Cafe Mutations
+        // Cafe Mutations (Admin only)
         createCafe: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             if (user.role !== 'admin') throw new Error('Only admin can create cafes');
@@ -894,7 +894,7 @@ const resolvers = {
                 const result = await pool.query(
                     `INSERT INTO menu_items (cafe_id, name, description, price, category, preparation_time, image_url, status) 
                      VALUES ($1, $2, $3, $4, $5, $6, $7, 'Available') 
-                     RETURNING *`,
+                     RETURNING id, name, description, price, category, status, image_url, created_at`,
                     [cafe_id, name, description || null, price, category || null, preparation_time || null, image_url || null]
                 );
                 
@@ -911,12 +911,11 @@ const resolvers = {
             try {
                 // Get cafe_id from menu item
                 const menuResult = await pool.query(
-                    'SELECT cafe_id, name, price, category, description, image_url FROM menu_items WHERE id = $1 AND deleted_at IS NULL',
+                    'SELECT cafe_id FROM menu_items WHERE id = $1 AND deleted_at IS NULL',
                     [id]
                 );
                 if (menuResult.rows.length === 0) throw new Error('Menu item not found');
-                const existingItem = menuResult.rows[0];
-                const cafeId = existingItem.cafe_id;
+                const cafeId = menuResult.rows[0].cafe_id;
                 
                 // Check if user owns this cafe
                 const ownsCafe = await checkUserOwnsCafe(user.id, cafeId);
@@ -926,38 +925,27 @@ const resolvers = {
                 
                 const { name, description, price, category, status, preparation_time, image_url } = input;
                 
-                // Build dynamic update query
                 const updates = [];
                 const values = [];
                 let paramCount = 1;
                 
                 if (name !== undefined) { updates.push(`name = $${paramCount++}`); values.push(name); }
-                else { updates.push(`name = $${paramCount++}`); values.push(existingItem.name); }
-                
                 if (description !== undefined) { updates.push(`description = $${paramCount++}`); values.push(description); }
-                else { updates.push(`description = $${paramCount++}`); values.push(existingItem.description); }
-                
                 if (price !== undefined) { updates.push(`price = $${paramCount++}`); values.push(price); }
-                else { updates.push(`price = $${paramCount++}`); values.push(existingItem.price); }
-                
                 if (category !== undefined) { updates.push(`category = $${paramCount++}`); values.push(category); }
-                else { updates.push(`category = $${paramCount++}`); values.push(existingItem.category); }
-                
                 if (status !== undefined) { updates.push(`status = $${paramCount++}`); values.push(status); }
-                
                 if (preparation_time !== undefined) { updates.push(`preparation_time = $${paramCount++}`); values.push(preparation_time); }
-                
                 if (image_url !== undefined) { updates.push(`image_url = $${paramCount++}`); values.push(image_url); }
-                else if (existingItem.image_url) { updates.push(`image_url = $${paramCount++}`); values.push(existingItem.image_url); }
                 
-                updates.push(`updated_at = CURRENT_TIMESTAMP`);
+                if (updates.length === 0) throw new Error('No fields to update');
+                
                 values.push(id);
                 
                 const query = `
                     UPDATE menu_items 
                     SET ${updates.join(', ')}
                     WHERE id = $${paramCount} AND deleted_at IS NULL
-                    RETURNING *
+                    RETURNING id, name, description, price, category, status, image_url, created_at
                 `;
                 
                 const result = await pool.query(query, values);
