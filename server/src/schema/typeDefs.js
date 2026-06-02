@@ -92,6 +92,8 @@ const typeDefs = gql`
         payment_type: String!
         order_status: String!
         special_instructions: String
+        delivery_address: String
+        delivery_fee: Float
         pickup_time: String
         completed_at: String
         created_at: String!
@@ -154,9 +156,34 @@ const typeDefs = gql`
         menu_item: MenuItem
     }
 
+    type OCRValidation {
+        id: ID!
+        student_id: Int!
+        image_path: String
+        extracted_data: String
+        extracted_name: String
+        confidence_score: Float
+        status: String!
+        error_message: String
+        created_at: String!
+        student: Student
+    }
+
     type AuthPayload {
         token: String!
         user: User!
+    }
+
+    type PaymentResult {
+        success: Boolean!
+        message: String!
+    }
+
+    type OCRResult {
+        success: Boolean!
+        extracted_name: String
+        confidence: Float
+        message: String
     }
 
     # ============== INPUT TYPES ==============
@@ -171,6 +198,7 @@ const typeDefs = gql`
         institution: String!
         department: String
         year_of_study: Int
+        id_image_base64: String
     }
 
     input LoginInput {
@@ -231,25 +259,52 @@ const typeDefs = gql`
         customizations: String
     }
 
+    input CreateStaffInput {
+        username: String!
+        email: String!
+        password: String!
+        full_name: String!
+        phone: String
+        role: String!
+        cafe_id: Int
+    }
+
     # ============== QUERIES ==============
     
     type Query {
+        # Test
         hello: String!
+        
+        # User queries
         me: User
         user(id: ID!): User
         users(role: String, limit: Int, offset: Int): [User!]!
+        
+        # Student queries
         myProfile: Student
         student(id: ID!): Student
         students(limit: Int, offset: Int): [Student!]!
+        
+        # Cafe queries
         cafes(active_only: Boolean): [Cafe!]!
         cafe(id: ID!): Cafe
+        
+        # Owner queries
         getMyCafes: [Cafe!]!
+        
+        # Menu queries
         menuItems(cafe_id: ID, category: String): [MenuItem!]!
         menuItem(id: ID!): MenuItem
+        
+        # Order queries
         myOrders(limit: Int, status: String): [Order!]!
         cafeOrders(cafe_id: ID, status: String, limit: Int): [Order!]!
         order(id: ID!): Order
+        
+        # Cart queries
         myCart: Cart
+        
+        # Delivery queries
         myDeliveries(status: String): [Delivery!]!
         deliveries(limit: Int): [Delivery!]!
     }
@@ -261,17 +316,23 @@ const typeDefs = gql`
         register(input: RegisterInput!): AuthPayload!
         login(input: LoginInput!): AuthPayload!
         
+        # Staff management (Admin only)
+        createStaff(input: CreateStaffInput!): User!
+        
+        # OCR Verification
+        verifyStudentWithOCR(id_image_base64: String!, full_name: String!): OCRResult!
+        
         # Cafe mutations
         createCafe(input: CreateCafeInput!): Cafe!
+        registerCafe(input: CreateCafeInput!): Cafe!
         updateCafe(id: ID!, input: UpdateCafeInput!): Cafe!
         deleteCafe(id: ID!): Boolean!
-        toggleCafeStatus(id: ID!): Cafe!
-        
-        # Admin mutations
-        registerCafe(input: CreateCafeInput!): Cafe!
-        assignCafeOwner(cafe_id: ID!, user_id: ID!): CafeUser!
         softDeleteCafe(id: ID!): Cafe!
         restoreCafe(id: ID!): Cafe!
+        toggleCafeStatus(id: ID!): Cafe!
+        
+        # Cafe owner assignment
+        assignCafeOwner(cafe_id: ID!, user_id: ID!): CafeUser!
         
         # Menu item mutations
         createMenuItem(input: CreateMenuItemInput!): MenuItem!
