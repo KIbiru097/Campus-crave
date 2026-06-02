@@ -43,16 +43,13 @@ const resolvers = {
     // ============== QUERY RESOLVERS ==============
     
     Query: {
-        // Test query
         hello: () => 'Welcome to Campus Crave Digital Ordering System!',
         
-        // Get current user
         me: async (_, __, { user }) => {
             if (!user) throw new Error('Not authenticated');
             return user;
         },
         
-        // Get all cafes (exclude soft deleted)
         cafes: async () => {
             try {
                 const result = await pool.query(
@@ -65,7 +62,6 @@ const resolvers = {
             }
         },
         
-        // Get single cafe
         cafe: async (_, { id }) => {
             try {
                 const result = await pool.query(
@@ -80,7 +76,6 @@ const resolvers = {
             }
         },
         
-        // Get menu items (exclude soft deleted)
         menuItems: async (_, { cafe_id }) => {
             try {
                 let query = 'SELECT * FROM menu_items WHERE deleted_at IS NULL AND status = $1';
@@ -101,7 +96,6 @@ const resolvers = {
             }
         },
         
-        // Get single menu item
         menuItem: async (_, { id }) => {
             try {
                 const result = await pool.query(
@@ -116,7 +110,6 @@ const resolvers = {
             }
         },
         
-        // Get my cart
         myCart: async (_, __, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -132,7 +125,6 @@ const resolvers = {
                 
                 const studentId = studentResult.rows[0].id;
                 
-                // Get or create cart
                 let cartResult = await pool.query(
                     'SELECT * FROM carts WHERE student_id = $1',
                     [studentId]
@@ -148,9 +140,8 @@ const resolvers = {
                     cart = newCart.rows[0];
                 }
                 
-                // Get cart items
                 const itemsResult = await pool.query(
-                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category, mi.description
+                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category, mi.description, mi.image_url
                      FROM cart_items ci
                      JOIN menu_items mi ON ci.menu_item_id = mi.id
                      WHERE ci.cart_id = $1 AND mi.deleted_at IS NULL`,
@@ -173,7 +164,6 @@ const resolvers = {
             }
         },
         
-        // Get my orders
         myOrders: async (_, { limit = 50, status }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -210,7 +200,6 @@ const resolvers = {
             }
         },
         
-        // Get single order
         order: async (_, { id }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -231,7 +220,6 @@ const resolvers = {
             }
         },
         
-        // Get user profile
         myProfile: async (_, __, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -252,7 +240,6 @@ const resolvers = {
             }
         },
         
-        // Get all users (admin only)
         users: async (_, { role, limit = 100, offset = 0 }, { user }) => {
             if (!user || user.role !== 'admin') throw new Error('Not authorized');
             
@@ -278,7 +265,6 @@ const resolvers = {
             }
         },
         
-        // Get user by id
         user: async (_, { id }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -296,25 +282,76 @@ const resolvers = {
             }
         },
         
-        // Get cafes for owner (only their cafes)
         getMyCafes: async (_, __, { user }) => {
             if (!user) throw new Error('Not authenticated');
-            if (user.role !== 'owner' && user.role !== 'staff') {
+            if (user.role !== 'owner' && user.role !== 'staff' && user.role !== 'admin') {
                 throw new Error('Not authorized');
             }
             
             try {
-                const result = await pool.query(
-                    `SELECT c.* FROM cafes c
-                     JOIN cafe_users cu ON c.id = cu.cafe_id
-                     WHERE cu.user_id = $1 AND c.deleted_at IS NULL
-                     ORDER BY c.name`,
-                    [user.id]
-                );
+                let query;
+                let values;
+                
+                if (user.role === 'admin') {
+                    query = 'SELECT * FROM cafes WHERE deleted_at IS NULL ORDER BY name';
+                    values = [];
+                } else {
+                    query = `
+                        SELECT c.* FROM cafes c
+                        JOIN cafe_users cu ON c.id = cu.cafe_id
+                        WHERE cu.user_id = $1 AND c.deleted_at IS NULL
+                        ORDER BY c.name
+                    `;
+                    values = [user.id];
+                }
+                
+                const result = await pool.query(query, values);
                 return result.rows;
             } catch (error) {
                 console.error('Error fetching my cafes:', error);
                 throw new Error('Failed to fetch cafes');
+            }
+        },
+        
+        myDeliveries: async (_, { status }, { user }) => {
+            if (!user) throw new Error('Not authenticated');
+            if (user.role !== 'delivery') throw new Error('Not authorized');
+            
+            try {
+                let query = 'SELECT * FROM deliveries WHERE delivery_person_id = $1';
+                const values = [user.id];
+                
+                if (status) {
+                    query += ' AND status = $2';
+                    values.push(status);
+                }
+                
+                query += ' ORDER BY created_at DESC';
+                
+                const result = await pool.query(query, values);
+                return result.rows;
+            } catch (error) {
+                console.error('Error fetching my deliveries:', error);
+                throw new Error('Failed to fetch deliveries');
+            }
+        },
+        
+        deliveries: async (_, { limit = 100 }, { user }) => {
+            if (!user || user.role !== 'admin') throw new Error('Not authorized');
+            
+            try {
+                const result = await pool.query(
+                    `SELECT d.*, u.username as delivery_person_name
+                     FROM deliveries d
+                     JOIN users u ON d.delivery_person_id = u.id
+                     ORDER BY d.created_at DESC
+                     LIMIT $1`,
+                    [limit]
+                );
+                return result.rows;
+            } catch (error) {
+                console.error('Error fetching deliveries:', error);
+                throw new Error('Failed to fetch deliveries');
             }
         },
     },
@@ -379,7 +416,7 @@ const resolvers = {
     // ============== MUTATION RESOLVERS ==============
     
     Mutation: {
-        // Register new user
+        // Auth Mutations
         register: async (_, { input }) => {
             try {
                 const existingEmail = await pool.query(
@@ -424,7 +461,6 @@ const resolvers = {
             }
         },
         
-        // Login user
         login: async (_, { input }) => {
             try {
                 const userResult = await pool.query(
@@ -459,7 +495,7 @@ const resolvers = {
             }
         },
         
-        // Add to cart
+        // Cart Mutations
         addToCart: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -535,7 +571,6 @@ const resolvers = {
             }
         },
         
-        // Update cart item quantity
         updateCartItem: async (_, { cart_item_id, quantity }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -556,7 +591,6 @@ const resolvers = {
             }
         },
         
-        // Remove from cart
         removeFromCart: async (_, { cart_item_id }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -569,7 +603,6 @@ const resolvers = {
             }
         },
         
-        // Clear cart
         clearCart: async (_, __, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -598,7 +631,7 @@ const resolvers = {
             }
         },
         
-        // Create order
+        // Order Mutations
         createOrder: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -673,7 +706,6 @@ const resolvers = {
             }
         },
         
-        // Update order status
         updateOrderStatus: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             if (user.role !== 'staff' && user.role !== 'owner' && user.role !== 'admin') {
@@ -697,7 +729,6 @@ const resolvers = {
             }
         },
         
-        // Cancel order
         cancelOrder: async (_, { order_id }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -729,7 +760,7 @@ const resolvers = {
             }
         },
         
-        // Create cafe (admin only)
+        // Cafe Mutations
         createCafe: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             if (user.role !== 'admin') throw new Error('Only admin can create cafes');
@@ -751,29 +782,81 @@ const resolvers = {
             }
         },
         
-        // Register cafe (admin only)
-        registerCafe: async (_, { input }, { user }) => {
+        updateCafe: async (_, { id, input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
-            if (user.role !== 'admin') throw new Error('Only admin can register cafes');
+            if (user.role !== 'admin') throw new Error('Not authorized');
             
             try {
-                const { name, description, location, contact_phone } = input;
+                const { name, description, location, contact_phone, is_active } = input;
                 
-                const result = await pool.query(
-                    `INSERT INTO cafes (name, description, location, contact_phone, is_active) 
-                     VALUES ($1, $2, $3, $4, true) 
-                     RETURNING *`,
-                    [name, description || null, location, contact_phone || null]
-                );
+                const updates = [];
+                const values = [];
+                let paramCount = 1;
                 
+                if (name !== undefined) { updates.push(`name = $${paramCount++}`); values.push(name); }
+                if (description !== undefined) { updates.push(`description = $${paramCount++}`); values.push(description); }
+                if (location !== undefined) { updates.push(`location = $${paramCount++}`); values.push(location); }
+                if (contact_phone !== undefined) { updates.push(`contact_phone = $${paramCount++}`); values.push(contact_phone); }
+                if (is_active !== undefined) { updates.push(`is_active = $${paramCount++}`); values.push(is_active); }
+                
+                if (updates.length === 0) throw new Error('No fields to update');
+                
+                updates.push(`updated_at = CURRENT_TIMESTAMP`);
+                values.push(id);
+                
+                const query = `
+                    UPDATE cafes 
+                    SET ${updates.join(', ')}
+                    WHERE id = $${paramCount} AND deleted_at IS NULL
+                    RETURNING *
+                `;
+                
+                const result = await pool.query(query, values);
+                if (result.rows.length === 0) throw new Error('Cafe not found');
                 return result.rows[0];
             } catch (error) {
-                console.error('Register cafe error:', error);
-                throw new Error('Failed to register cafe');
+                console.error('Update cafe error:', error);
+                throw new Error('Failed to update cafe');
             }
         },
         
-        // Assign cafe owner (admin only)
+        deleteCafe: async (_, { id }, { user }) => {
+            if (!user) throw new Error('Not authenticated');
+            if (user.role !== 'admin') throw new Error('Not authorized');
+            
+            try {
+                const result = await pool.query(
+                    'UPDATE cafes SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL RETURNING id',
+                    [id]
+                );
+                return result.rows.length > 0;
+            } catch (error) {
+                console.error('Delete cafe error:', error);
+                throw new Error('Failed to delete cafe');
+            }
+        },
+        
+        toggleCafeStatus: async (_, { id }, { user }) => {
+            if (!user) throw new Error('Not authenticated');
+            if (user.role !== 'admin') throw new Error('Not authorized');
+            
+            try {
+                const result = await pool.query(
+                    `UPDATE cafes 
+                     SET is_active = NOT is_active, updated_at = CURRENT_TIMESTAMP
+                     WHERE id = $1 AND deleted_at IS NULL
+                     RETURNING *`,
+                    [id]
+                );
+                
+                if (result.rows.length === 0) throw new Error('Cafe not found');
+                return result.rows[0];
+            } catch (error) {
+                console.error('Toggle cafe status error:', error);
+                throw new Error('Failed to toggle cafe status');
+            }
+        },
+        
         assignCafeOwner: async (_, { cafe_id, user_id }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             if (user.role !== 'admin') throw new Error('Only admin can assign owners');
@@ -794,43 +877,8 @@ const resolvers = {
             }
         },
         
-        // Soft delete cafe (admin only)
-        softDeleteCafe: async (_, { id }, { user }) => {
-            if (!user) throw new Error('Not authenticated');
-            if (user.role !== 'admin') throw new Error('Not authorized');
-            
-            try {
-                const result = await pool.query(
-                    'UPDATE cafes SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL RETURNING *',
-                    [id]
-                );
-                if (result.rows.length === 0) throw new Error('Cafe not found or already deleted');
-                return result.rows[0];
-            } catch (error) {
-                console.error('Soft delete cafe error:', error);
-                throw new Error('Failed to delete cafe');
-            }
-        },
+        // ============== MENU ITEM MUTATIONS (FIXED) ==============
         
-        // Restore cafe (admin only)
-        restoreCafe: async (_, { id }, { user }) => {
-            if (!user) throw new Error('Not authenticated');
-            if (user.role !== 'admin') throw new Error('Not authorized');
-            
-            try {
-                const result = await pool.query(
-                    'UPDATE cafes SET deleted_at = NULL WHERE id = $1 RETURNING *',
-                    [id]
-                );
-                if (result.rows.length === 0) throw new Error('Cafe not found');
-                return result.rows[0];
-            } catch (error) {
-                console.error('Restore cafe error:', error);
-                throw new Error('Failed to restore cafe');
-            }
-        },
-        
-        // Create menu item (owner/staff of that cafe)
         createMenuItem: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -853,23 +901,24 @@ const resolvers = {
                 return result.rows[0];
             } catch (error) {
                 console.error('Create menu item error:', error);
-                throw new Error('Failed to create menu item');
+                throw new Error(error.message || 'Failed to create menu item');
             }
         },
         
-        // Update menu item (owner/staff of that cafe)
         updateMenuItem: async (_, { id, input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
             try {
                 // Get cafe_id from menu item
                 const menuResult = await pool.query(
-                    'SELECT cafe_id FROM menu_items WHERE id = $1 AND deleted_at IS NULL',
+                    'SELECT cafe_id, name, price, category, description, image_url FROM menu_items WHERE id = $1 AND deleted_at IS NULL',
                     [id]
                 );
                 if (menuResult.rows.length === 0) throw new Error('Menu item not found');
-                const cafeId = menuResult.rows[0].cafe_id;
+                const existingItem = menuResult.rows[0];
+                const cafeId = existingItem.cafe_id;
                 
+                // Check if user owns this cafe
                 const ownsCafe = await checkUserOwnsCafe(user.id, cafeId);
                 if (user.role !== 'admin' && !ownsCafe) {
                     throw new Error('Not authorized to update items from this cafe');
@@ -877,19 +926,29 @@ const resolvers = {
                 
                 const { name, description, price, category, status, preparation_time, image_url } = input;
                 
+                // Build dynamic update query
                 const updates = [];
                 const values = [];
                 let paramCount = 1;
                 
                 if (name !== undefined) { updates.push(`name = $${paramCount++}`); values.push(name); }
-                if (description !== undefined) { updates.push(`description = $${paramCount++}`); values.push(description); }
-                if (price !== undefined) { updates.push(`price = $${paramCount++}`); values.push(price); }
-                if (category !== undefined) { updates.push(`category = $${paramCount++}`); values.push(category); }
-                if (status !== undefined) { updates.push(`status = $${paramCount++}`); values.push(status); }
-                if (preparation_time !== undefined) { updates.push(`preparation_time = $${paramCount++}`); values.push(preparation_time); }
-                if (image_url !== undefined) { updates.push(`image_url = $${paramCount++}`); values.push(image_url); }
+                else { updates.push(`name = $${paramCount++}`); values.push(existingItem.name); }
                 
-                if (updates.length === 0) throw new Error('No fields to update');
+                if (description !== undefined) { updates.push(`description = $${paramCount++}`); values.push(description); }
+                else { updates.push(`description = $${paramCount++}`); values.push(existingItem.description); }
+                
+                if (price !== undefined) { updates.push(`price = $${paramCount++}`); values.push(price); }
+                else { updates.push(`price = $${paramCount++}`); values.push(existingItem.price); }
+                
+                if (category !== undefined) { updates.push(`category = $${paramCount++}`); values.push(category); }
+                else { updates.push(`category = $${paramCount++}`); values.push(existingItem.category); }
+                
+                if (status !== undefined) { updates.push(`status = $${paramCount++}`); values.push(status); }
+                
+                if (preparation_time !== undefined) { updates.push(`preparation_time = $${paramCount++}`); values.push(preparation_time); }
+                
+                if (image_url !== undefined) { updates.push(`image_url = $${paramCount++}`); values.push(image_url); }
+                else if (existingItem.image_url) { updates.push(`image_url = $${paramCount++}`); values.push(existingItem.image_url); }
                 
                 updates.push(`updated_at = CURRENT_TIMESTAMP`);
                 values.push(id);
@@ -906,57 +965,45 @@ const resolvers = {
                 return result.rows[0];
             } catch (error) {
                 console.error('Update menu item error:', error);
-                throw new Error('Failed to update menu item');
+                throw new Error(error.message || 'Failed to update menu item');
             }
         },
         
-        // Soft delete menu item (owner/staff of that cafe)
-        softDeleteMenuItem: async (_, { id }, { user }) => {
+        deleteMenuItem: async (_, { id }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
             try {
+                // Get cafe_id from menu item
                 const menuResult = await pool.query(
                     'SELECT cafe_id FROM menu_items WHERE id = $1 AND deleted_at IS NULL',
                     [id]
                 );
-                if (menuResult.rows.length === 0) throw new Error('Menu item not found');
+                
+                if (menuResult.rows.length === 0) {
+                    return false;
+                }
+                
                 const cafeId = menuResult.rows[0].cafe_id;
                 
+                // Check if user owns this cafe
                 const ownsCafe = await checkUserOwnsCafe(user.id, cafeId);
                 if (user.role !== 'admin' && !ownsCafe) {
                     throw new Error('Not authorized to delete items from this cafe');
                 }
                 
                 const result = await pool.query(
-                    'UPDATE menu_items SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL RETURNING *',
+                    'UPDATE menu_items SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL RETURNING id',
                     [id]
                 );
-                if (result.rows.length === 0) throw new Error('Menu item not found or already deleted');
-                return result.rows[0];
+                
+                return result.rows.length > 0;
             } catch (error) {
-                console.error('Soft delete menu item error:', error);
-                throw new Error('Failed to delete menu item');
+                console.error('Delete menu item error:', error);
+                throw new Error(error.message || 'Failed to delete menu item');
             }
         },
         
-        // Restore menu item
-        restoreMenuItem: async (_, { id }, { user }) => {
-            if (!user) throw new Error('Not authenticated');
-            
-            try {
-                const result = await pool.query(
-                    'UPDATE menu_items SET deleted_at = NULL WHERE id = $1 RETURNING *',
-                    [id]
-                );
-                if (result.rows.length === 0) throw new Error('Menu item not found');
-                return result.rows[0];
-            } catch (error) {
-                console.error('Restore menu item error:', error);
-                throw new Error('Failed to restore menu item');
-            }
-        },
-        
-        // Assign delivery (admin only)
+        // Delivery Mutations
         assignDelivery: async (_, { order_id, delivery_person_id }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             if (user.role !== 'admin') throw new Error('Not authorized');
@@ -981,7 +1028,6 @@ const resolvers = {
             }
         },
         
-        // Update delivery status
         updateDeliveryStatus: async (_, { delivery_id, status }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -1012,7 +1058,7 @@ const resolvers = {
                 console.error('Update delivery status error:', error);
                 throw new Error('Failed to update delivery status');
             }
-        }
+        },
     }
 };
 

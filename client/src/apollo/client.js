@@ -1,14 +1,13 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 
-const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
-
 const httpLink = createHttpLink({
-    uri: `${BACKEND_URL}/graphql`,
+    uri: 'https://campus-crave-e5aa.onrender.com/graphql',
 });
 
 const authLink = setContext((_, { headers }) => {
     const token = localStorage.getItem('token');
+    console.log('Setting authorization header:', token ? 'Token exists' : 'No token');
     return {
         headers: {
             ...headers,

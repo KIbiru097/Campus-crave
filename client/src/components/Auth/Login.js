@@ -27,8 +27,21 @@ const Login = () => {
             });
 
             if (data?.login) {
-                login(data.login.token, data.login.user);
-                navigate('/');
+                const { token, user } = data.login;
+                login(token, user);
+                
+                // Redirect based on user role
+                if (user.role === 'admin') {
+                    navigate('/admin');
+                } else if (user.role === 'owner') {
+                    navigate('/cafe-management');
+                } else if (user.role === 'staff') {
+                    navigate('/cafe-management');
+                } else if (user.role === 'delivery') {
+                    navigate('/delivery-dashboard');
+                } else {
+                    navigate('/');
+                }
             }
         } catch (err) {
             setError(err.message || 'Login failed. Please check your credentials.');
@@ -40,24 +53,29 @@ const Login = () => {
     return (
         <div style={styles.container}>
             <div style={styles.card}>
-                <h2 style={styles.title}>Login to Campus Crave</h2>
+                <h2 style={styles.title}>Welcome Back</h2>
+                <p style={styles.subtitle}>Login to your account</p>
                 <form onSubmit={handleSubmit}>
-                    <input
-                        type="email"
-                        placeholder="Email Address"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        style={styles.input}
-                        required
-                    />
-                    <input
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        style={styles.input}
-                        required
-                    />
+                    <div style={styles.inputGroup}>
+                        <input
+                            type="email"
+                            placeholder="Email Address"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            style={styles.input}
+                            required
+                        />
+                    </div>
+                    <div style={styles.inputGroup}>
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            style={styles.input}
+                            required
+                        />
+                    </div>
                     {error && <div style={styles.error}>{error}</div>}
                     <button type="submit" disabled={loading} style={styles.button}>
                         {loading ? 'Logging in...' : 'Login'}
@@ -66,6 +84,26 @@ const Login = () => {
                 <p style={styles.footer}>
                     Don't have an account? <Link to="/register" style={styles.link}>Register here</Link>
                 </p>
+                <div style={styles.demoCredentials}>
+                    <p style={styles.demoTitle}>Demo Credentials:</p>
+                    <div style={styles.demoGrid}>
+                        <div>
+                            <strong>Student:</strong><br />
+                            Email: student@test.com<br />
+                            Password: student123
+                        </div>
+                        <div>
+                            <strong>Admin:</strong><br />
+                            Email: admin@campuscrave.com<br />
+                            Password: Admin123
+                        </div>
+                        <div>
+                            <strong>Owner:</strong><br />
+                            Email: owner@campuscrave.com<br />
+                            Password: Owner123
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -78,39 +116,50 @@ const styles = {
         alignItems: 'center',
         minHeight: '80vh',
         padding: '20px',
+        backgroundColor: '#f5f7fa',
     },
     card: {
         background: 'white',
         padding: '40px',
-        borderRadius: '10px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        borderRadius: '16px',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
         width: '100%',
-        maxWidth: '400px',
+        maxWidth: '450px',
     },
     title: {
         textAlign: 'center',
+        marginBottom: '10px',
+        color: '#2d6a4f',
+        fontSize: '28px',
+    },
+    subtitle: {
+        textAlign: 'center',
         marginBottom: '30px',
-        color: '#2c3e50',
+        color: '#52b788',
+    },
+    inputGroup: {
+        marginBottom: '20px',
     },
     input: {
         width: '100%',
-        padding: '12px',
-        marginBottom: '15px',
-        border: '1px solid #ddd',
-        borderRadius: '5px',
+        padding: '14px',
+        border: '1px solid #d8f3dc',
+        borderRadius: '8px',
         fontSize: '14px',
-        boxSizing: 'border-box',
+        transition: 'border 0.3s',
+        outline: 'none',
     },
     button: {
         width: '100%',
-        padding: '12px',
-        backgroundColor: '#3498db',
+        padding: '14px',
+        backgroundColor: '#2d6a4f',
         color: 'white',
         border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
+        borderRadius: '8px',
         fontSize: '16px',
         fontWeight: 'bold',
+        cursor: 'pointer',
+        transition: 'background 0.3s',
     },
     error: {
         color: '#e74c3c',
@@ -118,15 +167,33 @@ const styles = {
         marginBottom: '15px',
         padding: '10px',
         backgroundColor: '#fdecea',
-        borderRadius: '5px',
+        borderRadius: '8px',
     },
     footer: {
         textAlign: 'center',
         marginTop: '20px',
     },
     link: {
-        color: '#3498db',
+        color: '#2d6a4f',
         textDecoration: 'none',
+    },
+    demoCredentials: {
+        marginTop: '25px',
+        paddingTop: '20px',
+        borderTop: '1px solid #d8f3dc',
+    },
+    demoTitle: {
+        fontSize: '12px',
+        color: '#666',
+        marginBottom: '10px',
+        textAlign: 'center',
+    },
+    demoGrid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '10px',
+        fontSize: '11px',
+        color: '#555',
     },
 };
 
