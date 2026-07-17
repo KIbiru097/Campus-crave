@@ -4,10 +4,10 @@ import { Link } from 'react-router-dom';
 import { GET_CAFES } from '../graphql/queries';
 
 const CafeList = () => {
-    const { loading, error, data } = useQuery(GET_CAFES);
+    const { loading, error, data, refetch } = useQuery(GET_CAFES);
 
     if (loading) return <LoadingSkeleton />;
-    if (error) return <ErrorMessage message={error.message} />;
+    if (error) return <ErrorMessage message={error.message} onRetry={() => refetch()} />;
 
     const cafes = data?.cafes || [];
 
@@ -63,13 +63,13 @@ const LoadingSkeleton = () => (
     </div>
 );
 
-const ErrorMessage = ({ message }) => (
+const ErrorMessage = ({ message, onRetry }) => (
     <div style={styles.errorContainer}>
         <div style={styles.errorCard}>
             <span style={styles.errorIcon}>😢</span>
             <h3>Oops! Something went wrong</h3>
             <p>{message}</p>
-            <button onClick={() => window.location.reload()} style={styles.retryBtn}>
+            <button onClick={onRetry} style={styles.retryBtn}>
                 Try Again
             </button>
         </div>

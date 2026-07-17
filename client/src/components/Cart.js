@@ -52,6 +52,10 @@ const Cart = () => {
     const handleUpdateQuantity = async (cartItemId, currentQty, change) => {
         const newQty = currentQty + change;
         if (newQty < 1) return;
+        if (newQty > 6) {
+            alert('Maximum 6 items per order');
+            return;
+        }
         
         try {
             await updateCartItem({
@@ -91,6 +95,10 @@ const Cart = () => {
     const handleProceedToCheckout = () => {
         if (!items.length) {
             alert('Your cart is empty');
+            return;
+        }
+        if (itemCount > 6) {
+            alert('Maximum 6 items per order. Please remove some items.');
             return;
         }
         navigate('/checkout');

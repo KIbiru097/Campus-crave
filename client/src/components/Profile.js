@@ -28,7 +28,7 @@ const Profile = () => {
                     </div>
                     <div style={styles.infoRow}>
                         <span>Phone:</span>
-                        <strong>{user?.phone || 'Not provided'}</strong>
+                        <strong>{data?.me?.phone || student?.phone_number || 'Not provided'}</strong>
                     </div>
                     <div style={styles.infoRow}>
                         <span>Role:</span>

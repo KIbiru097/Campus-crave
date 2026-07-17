@@ -345,15 +345,15 @@ Valid: Yes`,
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label>Phone</label>
+                                <label>Department</label>
                                 <div className="input-icon">
-                                    <i className="fas fa-phone"></i>
+                                    <i className="fas fa-book"></i>
                                     <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
+                                        type="text"
+                                        name="department"
+                                        value={formData.department}
                                         onChange={handleChange}
-                                        placeholder="Your phone number"
+                                        placeholder="Your department"
                                     />
                                 </div>
                             </div>
@@ -405,16 +405,34 @@ Valid: Yes`,
                                     />
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="form-row">
                             <div className="form-group">
-                                <label>Department</label>
+                                <label>Year of Study</label>
                                 <div className="input-icon">
-                                    <i className="fas fa-book"></i>
+                                    <i className="fas fa-calendar"></i>
+                                    <select name="year_of_study" value={formData.year_of_study} onChange={handleChange}>
+                                        <option value="">Select Year</option>
+                                        <option value="1">1st Year</option>
+                                        <option value="2">2nd Year</option>
+                                        <option value="3">3rd Year</option>
+                                        <option value="4">4th Year</option>
+                                        <option value="5">5th Year</option>
+                                        <option value="6">6th Year+</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Phone</label>
+                                <div className="input-icon">
+                                    <i className="fas fa-phone"></i>
                                     <input
-                                        type="text"
-                                        name="department"
-                                        value={formData.department}
+                                        type="tel"
+                                        name="phone"
+                                        value={formData.phone}
                                         onChange={handleChange}
-                                        placeholder="Your department"
+                                        placeholder="Your phone number"
                                     />
                                 </div>
                             </div>

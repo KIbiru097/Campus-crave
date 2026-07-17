@@ -1,5 +1,6 @@
 import React from 'react';
 import { useQuery } from '@apollo/client';
+import { Link } from 'react-router-dom';
 import { GET_MY_ORDERS } from '../graphql/queries';
 
 const Orders = () => {
@@ -16,9 +17,11 @@ const Orders = () => {
                 <div style={styles.emptyIcon}>📦</div>
                 <h2>No Orders Yet</h2>
                 <p>Start ordering from your favorite cafes!</p>
-                <button onClick={() => window.location.href = '/'} style={styles.browseBtn}>
-                    Browse Cafes
-                </button>
+                <Link to="/">
+                    <button style={styles.browseBtn}>
+                        Browse Cafes
+                    </button>
+                </Link>
             </div>
         );
     }
