@@ -16,7 +16,7 @@ import { useAuth } from '../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
     const [email, setEmail] = useState('');
-    [password, setPassword] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
 

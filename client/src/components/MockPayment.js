@@ -23,7 +23,7 @@ const MockPayment = () => {
         
         setTimeout(async () => {
             try {
-                const response = await fetch(`http://localhost:4000/api/payment/verify/${txRef}`);
+                const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://campus-crave-e5aa.onrender.com'}/api/payment/verify/${txRef}`);
                 const result = await response.json();
                 
                 if (result.success) {
@@ -316,14 +316,17 @@ const styles = {
     },
 };
 
-// Add keyframe animation
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-`;
-document.head.appendChild(styleSheet);
+// Add keyframe animation (only once)
+if (!document.getElementById('mock-payment-styles')) {
+    const styleSheet = document.createElement("style");
+    styleSheet.id = 'mock-payment-styles';
+    styleSheet.textContent = `
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(styleSheet);
+}
 
 export default MockPayment;

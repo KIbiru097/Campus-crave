@@ -21,7 +21,6 @@ const CheckoutPage = () => {
     const total = cart?.total || 0;
     const itemCount = cart?.item_count || 0;
 
-    // Get payment rules based on item count
     const getPaymentRules = (count) => {
         if (count >= 4 && count <= 6) {
             return {
@@ -50,19 +49,22 @@ const CheckoutPage = () => {
     };
 
     useEffect(() => {
+        if (items.length === 0 && !loading) {
+            navigate('/cart');
+            return;
+        }
         const rules = getPaymentRules(itemCount);
         setPaymentRules(rules);
         if (rules.allowedMethods.length === 1 && rules.allowedMethods[0] === 'Online') {
             setPaymentMethod('Online');
         }
-    }, [itemCount]);
+    }, [itemCount, loading, navigate]);
 
     const deliveryFee = total > 150 ? 0 : 30;
     const serviceFee = 10;
     const grandTotal = total + deliveryFee + serviceFee;
 
     const handlePlaceOrder = async () => {
-        // Validate payment method
         if (paymentRules?.requiredOnline && paymentMethod !== 'Online') {
             setPaymentError('This order requires online payment. Cash on delivery is not available.');
             return;
@@ -82,14 +84,21 @@ const CheckoutPage = () => {
         setProcessing(true);
 
         try {
-            const cafeId = items[0]?.menu_item?.cafe_id || 1;
+            const cafeIds = [...new Set(items.map(item => item.menu_item?.cafe_id).filter(Boolean))];
+            const cafeId = cafeIds.length === 1 ? cafeIds[0] : null;
+            if (!cafeId) {
+                setPaymentError('Cart contains items from multiple cafes. Please order from one cafe at a time.');
+                setProcessing(false);
+                return;
+            }
 
             const { data: orderData } = await createOrder({
                 variables: {
                     input: {
                         cafe_id: cafeId,
                         payment_type: paymentMethod === 'COD' ? 'COD' : 'Online',
-                        special_instructions: specialInstructions || null
+                        special_instructions: special_instructions || null,
+                        delivery_address: deliveryAddress || null
                     }
                 }
             });
@@ -134,10 +143,6 @@ const CheckoutPage = () => {
 
     if (loading) return <div className="loading">Loading checkout...</div>;
     if (error) return <div className="error">Error: {error.message}</div>;
-    if (items.length === 0) {
-        navigate('/cart');
-        return null;
-    }
 
     const deliveryOptions = [
         { label: 'Dormitory', value: 'Dormitory Building' },

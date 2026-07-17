@@ -195,7 +195,10 @@ const Home = () => {
                     ))}
                 </div>
                 <div style={styles.viewAll}>
-                    <Link to="/">
+                    <Link to="/" onClick={(e) => {
+                        e.preventDefault();
+                        document.querySelector('[style*="cafesSection"]')?.scrollIntoView({ behavior: 'smooth' });
+                    }}>
                         <button style={styles.viewAllBtn}>View All Cafes →</button>
                     </Link>
                 </div>
@@ -498,23 +501,26 @@ const styles = {
     },
 };
 
-// Add animations
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-20px); }
-    }
-    .skeleton {
-        background: linear-gradient(90deg, #d8f3dc 25%, #fffef7 50%, #d8f3dc 75%);
-        background-size: 1000px 100%;
-        animation: shimmer 2s infinite;
-    }
-    @keyframes shimmer {
-        0% { background-position: -1000px 0; }
-        100% { background-position: 1000px 0; }
-    }
-`;
-document.head.appendChild(styleSheet);
+// Add animations (only once)
+if (!document.getElementById('home-animations')) {
+    const styleSheet = document.createElement("style");
+    styleSheet.id = 'home-animations';
+    styleSheet.textContent = `
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #d8f3dc 25%, #fffef7 50%, #d8f3dc 75%);
+            background-size: 1000px 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+    `;
+    document.head.appendChild(styleSheet);
+}
 
 export default Home;

@@ -65,22 +65,34 @@ const PaymentPage = () => {
         setProcessing(true);
         setError('');
 
-        // Simulate payment processing
-        setTimeout(() => {
-            setProcessing(false);
-            setShowSuccess(true);
+        try {
+            const response = await fetch(
+                `${process.env.REACT_APP_API_URL || 'https://campus-crave-e5aa.onrender.com'}/api/payment/initiate`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: orderId,
+                        amount: amount,
+                        email: user?.email || 'test@test.com',
+                        firstName: user?.username || 'Test',
+                        lastName: 'User'
+                    })
+                }
+            );
+            const result = await response.json();
             
-            // Countdown to redirect
-            const interval = setInterval(() => {
-                setCountdown(prev => {
-                    if (prev <= 1) {
-                        clearInterval(interval);
-                        navigate('/orders');
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }, 2000);
+            if (result.success && result.paymentUrl) {
+                window.location.href = result.paymentUrl;
+            } else {
+                setError('Payment initiation failed. Please try again.');
+                setProcessing(false);
+            }
+        } catch (err) {
+            console.error('Payment error:', err);
+            setProcessing(false);
+            setError('Payment failed. Please try again.');
+        }
     };
 
     if (showSuccess) {

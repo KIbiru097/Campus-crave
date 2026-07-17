@@ -5,7 +5,8 @@ import {
     FlatList,
     TouchableOpacity,
     StyleSheet,
-    Alert
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_CART } from '../graphql/queries';
@@ -23,10 +24,17 @@ const CartScreen = ({ navigation }) => {
         }
 
         try {
+            const cafeIds = [...new Set(items.map(item => item.menu_item?.cafe_id).filter(Boolean))];
+            const cafeId = cafeIds.length === 1 ? cafeIds[0] : null;
+            if (!cafeId) {
+                Alert.alert('Error', 'Cart contains items from multiple cafes. Please order from one cafe at a time.');
+                return;
+            }
+
             const { data: orderData } = await createOrder({
                 variables: {
                     input: {
-                        cafe_id: 1,
+                        cafe_id: cafeId,
                         payment_type: 'Online',
                         special_instructions: null
                     }

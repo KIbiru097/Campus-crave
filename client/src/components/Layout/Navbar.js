@@ -45,18 +45,17 @@ const Navbar = () => {
                                     👑 Admin
                                 </Link>
                             )}
-                            {(user.role === 'owner' || user.role === 'staff') && (
-                                <Link to="/cafe-management" style={{ ...styles.navLink, ...(isActive('/cafe-management') && styles.navLinkActive) }}>
-                                    🏪 My Cafe
-                                </Link>
-                            )}
+                    {(user.role === 'owner' || user.role === 'staff') && (
+                        <Link to="/cafe-management" style={{ ...styles.navLink, ...(isActive('/cafe-management') && styles.navLinkActive) }}>
+                            🏪 My Cafe
+                        </Link>
+                    )}
 
-                            // Add this inside the user section
-                          {user && user.role === 'delivery' && (
-                        <Link to="/delivery-dashboard" style={styles.navLink}>
-                                    🚚 Deliveries
-                           </Link>
-                            )}
+                    {user.role === 'delivery' && (
+                        <Link to="/delivery-dashboard" style={{ ...styles.navLink, ...(isActive('/delivery-dashboard') && styles.navLinkActive) }}>
+                            🚚 Deliveries
+                        </Link>
+                    )}
                             
                             {/* Common links for all users */}
                             <Link to="/orders" style={{ ...styles.navLink, ...(isActive('/orders') && styles.navLinkActive) }}>

@@ -4,9 +4,9 @@ const express = require('express');
 const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@apollo/server/express4');
 const cors = require('cors');
-const typeDefs = require('./schema/typeDefs');
-const { resolvers, getUserFromToken } = require('./schema/resolvers');
-const MockPaymentService = require('./services/mockPaymentService');
+const typeDefs = require('./src/schema/typeDefs');
+const { resolvers, getUserFromToken } = require('./src/schema/resolvers');
+const MockPaymentService = require('./src/services/mockPaymentService');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
