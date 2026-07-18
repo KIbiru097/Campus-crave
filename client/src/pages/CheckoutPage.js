@@ -97,7 +97,7 @@ const CheckoutPage = () => {
                     input: {
                         cafe_id: cafeId,
                         payment_type: paymentMethod === 'COD' ? 'COD' : 'Online',
-                        special_instructions: special_instructions || null,
+                        special_instructions: specialInstructions || null,
                         delivery_address: deliveryAddress || null
                     }
                 }
