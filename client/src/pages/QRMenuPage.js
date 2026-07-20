@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import Lenis from 'lenis';
 import HeroSection from '../components/QRMenu/HeroSection';
 import StickyNav from '../components/QRMenu/StickyNav';
 import SteamDivider from '../components/QRMenu/SteamDivider';
@@ -10,6 +11,36 @@ import ItemDetailSheet from '../components/QRMenu/ItemDetailSheet';
 import CheckoutSheet from '../components/QRMenu/CheckoutSheet';
 import { MOCK_MENU } from '../components/QRMenu/menuData';
 import '../components/QRMenu/QRMenu.css';
+
+const PARTICLES = Array.from({ length: 20 }, (_, i) => ({
+  id: i,
+  size: 2 + Math.random() * 3,
+  x: Math.random() * 100,
+  delay: Math.random() * 25,
+  duration: 18 + Math.random() * 22,
+  opacity: 0.12 + Math.random() * 0.2,
+}));
+
+function AmbientParticles() {
+  return (
+    <div className="qr-particles">
+      {PARTICLES.map(p => (
+        <div
+          key={p.id}
+          className="qr-particle"
+          style={{
+            width: p.size,
+            height: p.size,
+            left: `${p.x}%`,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            opacity: p.opacity,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function QRMenuPage() {
   const { tableId } = useParams();
@@ -21,6 +52,34 @@ export default function QRMenuPage() {
   const [favs, setFavs] = useState(new Set());
   const [openCart, setOpenCart] = useState(false);
   const menuRef = useRef(null);
+  const lenisRef = useRef(null);
+
+  useEffect(() => {
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      orientation: 'vertical',
+      gestureOrientation: 'vertical',
+      smoothWheel: true,
+      wheelMultiplier: 1,
+      touchMultiplier: 2,
+    });
+    lenisRef.current = lenis;
+    function raf(time) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+    return () => lenis.destroy();
+  }, []);
+
+  useEffect(() => {
+    if (openCart || selected || checkout) {
+      lenisRef.current?.stop();
+    } else {
+      lenisRef.current?.start();
+    }
+  }, [openCart, selected, checkout]);
 
   const menu = MOCK_MENU;
   const cats = ['All', 'Coffee', 'Pastries', 'Breakfast', 'Sandwiches', 'Salads', 'Desserts', 'Cold Drinks'];
@@ -58,18 +117,19 @@ export default function QRMenuPage() {
 
   return (
     <div className="qr-root">
-      <div className="qr-aurora"><div className="orb o1" /><div className="orb o2" /><div className="orb o3" /></div>
+      <div className="qr-aurora"><div className="orb o1" /><div className="orb o2" /><div className="orb o3" /><div className="orb o4" /></div>
+      <AmbientParticles />
 
-      <HeroSection tableNumber={tableId} onBrowse={() => menuRef.current?.scrollIntoView({ behavior: 'smooth' })} onStartOrder={() => menuRef.current?.scrollIntoView({ behavior: 'smooth' })} />
+      <HeroSection tableNumber={tableId} onBrowse={() => lenisRef.current?.scrollTo(menuRef.current, { offset: -20 })} onStartOrder={() => lenisRef.current?.scrollTo(menuRef.current, { offset: -20 })} />
 
       <div ref={menuRef}>
-        <StickyNav activeCategory={cat} onCategoryChange={c => { setCat(c); setSearch(''); }} searchQuery={search} onSearchChange={setSearch} cartCount={totalItems} onCartClick={() => setOpenCart(true)} />
+        <StickyNav activeCategory={cat} onCategoryChange={c => { setCat(c); setSearch(''); }} searchQuery={search} onSearchChange={setSearch} cartCount={totalItems} onCartClick={() => setOpenCart(true)} menuItems={menu} />
       </div>
 
       <AnimatePresence mode="wait">
-        <motion.div key={cat + search} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
+        <motion.div key={cat + search} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
           {search.trim() && (
-            <div className="qr-section" style={{ paddingTop: 20 }}>
+            <div className="qr-section" style={{ paddingTop: 28 }}>
               <div className="qr-section-head">
                 <h2 className="qr-section-title">Results</h2>
                 <span className="qr-section-count">{shown.length} item{shown.length !== 1 ? 's' : ''}</span>
@@ -101,7 +161,7 @@ export default function QRMenuPage() {
               </React.Fragment>
             ))
           ) : (
-            <section className="qr-section" style={{ paddingTop: 20 }}>
+            <section className="qr-section" style={{ paddingTop: 28 }}>
               <div className="qr-grid">
                 {shown.map((item, i) => (
                   <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} favorites={favs} onToggleFav={toggleFav} />
@@ -117,7 +177,6 @@ export default function QRMenuPage() {
       <AnimatePresence>
         {selected && !checkout && <ItemDetailSheet item={selected} onClose={() => setSelected(null)} onAddToCart={addCart} />}
       </AnimatePresence>
-
       <AnimatePresence>
         {checkout && <CheckoutSheet items={cart} menuItems={menu} tableNumber={tableId} onClose={() => setCheckout(false)} />}
       </AnimatePresence>

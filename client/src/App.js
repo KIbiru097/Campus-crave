@@ -18,6 +18,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import CafeManagement from './pages/CafeManagement';
 import DeliveryDashboard from './pages/DeliveryDashboard';
 import QRMenuPage from './pages/QRMenuPage';
+import QRCodeGenerator from './pages/QRCodeGenerator';
 
 const ProtectedRoute = ({ children }) => {
     const { user } = useAuth();
@@ -51,6 +52,7 @@ function AppContent() {
     return (
         <Routes>
             <Route path="/qr-menu/:tableId" element={<QRMenuPage />} />
+            <Route path="/qr-codes" element={<QRCodeGenerator />} />
             <Route path="*" element={
                 <>
                     <Navbar />

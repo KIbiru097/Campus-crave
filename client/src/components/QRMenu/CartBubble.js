@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CartBubble({ items, onUpdateQty, onRemove, onCheckout, menuItems, openCart, onOpenCartChange }) {
   const totalItems = items.reduce((s, i) => s + i.quantity, 0);
   const total = items.reduce((s, i) => { const m = menuItems.find(x => x.id === i.id); return s + (m ? m.price * i.quantity : 0); }, 0);
   const tax = total * 0.08;
+
+  const cartItems = useMemo(() => {
+    return items.map(ci => {
+      const m = menuItems.find(x => x.id === ci.id);
+      return m ? { ...ci, menuItem: m } : null;
+    }).filter(Boolean);
+  }, [items, menuItems]);
 
   return (
     <>
@@ -34,30 +41,26 @@ export default function CartBubble({ items, onUpdateQty, onRemove, onCheckout, m
                 <>
                   <div className="qr-cart-items">
                     <AnimatePresence>
-                      {items.map((ci, idx) => {
-                        const m = menuItems.find(x => x.id === ci.id);
-                        if (!m) return null;
-                        return (
-                          <motion.div key={ci.id} className="qr-cart-row" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20, height: 0, paddingTop: 0, paddingBottom: 0 }} transition={{ delay: idx * 0.04 }}>
-                            <img src={m.image} alt={m.name} />
-                            <div className="info">
-                              <div className="name">{m.name}</div>
-                              <div className="meta">{ci.size && `${ci.size} · `}{ci.milk && `${ci.milk} · `}${m.price.toFixed(2)} each</div>
+                      {cartItems.map((ci, idx) => (
+                        <motion.div key={ci.id} className="qr-cart-row" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20, height: 0, paddingTop: 0, paddingBottom: 0 }} transition={{ delay: idx * 0.04 }}>
+                          <img src={ci.menuItem.image} alt={ci.menuItem.name} />
+                          <div className="info">
+                            <div className="name">{ci.menuItem.name}</div>
+                            <div className="meta">{ci.size && `${ci.size} · `}{ci.milk && `${ci.milk} · `}${ci.menuItem.price.toFixed(2)} each</div>
+                          </div>
+                          <div className="ctrls">
+                            <div className="qr-cart-qty">
+                              <motion.button whileTap={{ scale: 0.8 }} onClick={() => onUpdateQty(ci.id, -1)}>−</motion.button>
+                              <motion.span key={ci.quantity} initial={{ scale: 1.3 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500 }}>{ci.quantity}</motion.span>
+                              <motion.button whileTap={{ scale: 0.8 }} onClick={() => onUpdateQty(ci.id, 1)}>+</motion.button>
                             </div>
-                            <div className="ctrls">
-                              <div className="qr-cart-qty">
-                                <motion.button whileTap={{ scale: 0.8 }} onClick={() => onUpdateQty(ci.id, -1)}>−</motion.button>
-                                <motion.span key={ci.quantity} initial={{ scale: 1.3 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500 }}>{ci.quantity}</motion.span>
-                                <motion.button whileTap={{ scale: 0.8 }} onClick={() => onUpdateQty(ci.id, 1)}>+</motion.button>
-                              </div>
-                              <span className="amt">${(m.price * ci.quantity).toFixed(2)}</span>
-                            </div>
-                            <motion.button className="rm" onClick={() => onRemove(ci.id)} whileTap={{ scale: 0.85 }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                            </motion.button>
-                          </motion.div>
-                        );
-                      })}
+                            <span className="amt">${(ci.menuItem.price * ci.quantity).toFixed(2)}</span>
+                          </div>
+                          <motion.button className="rm" onClick={() => onRemove(ci.id)} whileTap={{ scale: 0.85 }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                          </motion.button>
+                        </motion.div>
+                      ))}
                     </AnimatePresence>
                   </div>
                   <div className="qr-cart-foot">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 const SIZES = ['Small', 'Medium', 'Large'];
@@ -18,6 +18,7 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart }) {
   const [ice, setIce] = useState('Regular Ice');
   const [spice, setSpice] = useState(null);
   const [notes, setNotes] = useState('');
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   if (!item) return null;
 
@@ -37,10 +38,11 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart }) {
         <div className="qr-handle" />
 
         <div className="qr-detail-img-wrap">
-          <motion.img className="qr-detail-img" src={item.image} alt={item.name} initial={{ scale: 1.1, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5 }} />
+          {!imgLoaded && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(145deg,rgba(255,255,255,0.03),rgba(255,255,255,0.06))', filter: 'blur(20px)', transform: 'scale(1.1)' }} />}
+          <motion.img className="qr-detail-img" src={item.image} alt={item.name} initial={{ scale: 1.1, opacity: 0 }} animate={{ scale: 1, opacity: imgLoaded ? 1 : 0 }} transition={{ duration: 0.6 }} onLoad={() => setImgLoaded(true)} />
           <div className="qr-detail-img-grad" />
           {hasDiscount && (
-            <motion.div style={{ position: 'absolute', top: 16, right: 16, padding: '6px 14px', background: 'rgba(239,68,68,0.9)', borderRadius: 9999, fontSize: 12, fontWeight: 700, color: '#FFF', backdropFilter: 'blur(8px)' }} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
+            <motion.div style={{ position: 'absolute', top: 16, right: 16, padding: '6px 14px', background: 'rgba(239,68,68,0.92)', borderRadius: 9999, fontSize: 12, fontWeight: 700, color: '#FFF', backdropFilter: 'blur(8px)' }} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
               Save ${(item.originalPrice - item.price).toFixed(2)}
             </motion.div>
           )}

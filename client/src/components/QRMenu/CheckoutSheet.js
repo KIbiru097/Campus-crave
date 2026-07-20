@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 const TIPS = [{ label: '10%', value: 0.10 }, { label: '15%', value: 0.15 }, { label: '20%', value: 0.20 }, { label: '25%', value: 0.25 }, { label: 'None', value: 0 }];
@@ -15,7 +15,14 @@ export default function CheckoutSheet({ items, menuItems, tableNumber, onClose }
   const [promo, setPromo] = useState('');
   const [promoOn, setPromoOn] = useState(false);
 
-  const sub = items.reduce((s, i) => { const m = menuItems.find(x => x.id === i.id); return s + (m ? m.price * i.quantity : 0); }, 0);
+  const summaryItems = useMemo(() => {
+    return items.map(ci => {
+      const m = menuItems.find(x => x.id === ci.id);
+      return m ? { ...ci, menuItem: m } : null;
+    }).filter(Boolean);
+  }, [items, menuItems]);
+
+  const sub = summaryItems.reduce((s, ci) => s + ci.menuItem.price * ci.quantity, 0);
   const disc = promoOn ? sub * 0.1 : 0;
   const af = sub - disc;
   const tax = af * 0.08;
@@ -81,11 +88,12 @@ export default function CheckoutSheet({ items, menuItems, tableNumber, onClose }
           <motion.div className="qr-co-section" variants={fade}>
             <div className="qr-co-title">Order Summary</div>
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 'var(--radius-xs)', padding: '14px 16px' }}>
-              {items.map(ci => {
-                const m = menuItems.find(x => x.id === ci.id);
-                if (!m) return null;
-                return <div key={ci.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: 'var(--qr-muted)' }}><span>{ci.quantity}× {m.name}{ci.size ? ` (${ci.size})` : ''}</span><span style={{ color: 'var(--qr-text)', fontWeight: 500 }}>${(m.price * ci.quantity).toFixed(2)}</span></div>;
-              })}
+              {summaryItems.map(ci => (
+                <div key={ci.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, color: 'var(--qr-muted)' }}>
+                  <span>{ci.quantity}× {ci.menuItem.name}{ci.size ? ` (${ci.size})` : ''}</span>
+                  <span style={{ color: 'var(--qr-text)', fontWeight: 500 }}>${(ci.menuItem.price * ci.quantity).toFixed(2)}</span>
+                </div>
+              ))}
             </div>
           </motion.div>
 

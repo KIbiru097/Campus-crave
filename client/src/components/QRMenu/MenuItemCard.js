@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 
 const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
@@ -6,31 +6,44 @@ const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
 export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
   const ref = useRef(null);
   const [justAdded, setJustAdded] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const size = SIZES[index % SIZES.length];
   const hasDiscount = item.originalPrice && item.originalPrice > item.price;
   const isFav = favorites && favorites.has(item.id);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ x: y * -5, y: x * 5 });
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setTilt({ x: 0, y: 0 });
+  }, []);
 
   const handleAdd = e => {
     e.stopPropagation();
     onAdd(item);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 400);
-    // Fly-to-cart
     if (ref.current) {
       const r = ref.current.getBoundingClientRect();
       const b = document.querySelector('.qr-cart-orb');
       if (b) {
         const br = b.getBoundingClientRect();
         const el = document.createElement('div');
-        el.style.cssText = `position:fixed;top:${r.top + r.height / 3}px;left:${r.left + r.width / 2}px;width:44px;height:44px;border-radius:50%;background:linear-gradient(145deg,#D97706,#F59E0B);z-index:9999;pointer-events:none;transition:all .65s cubic-bezier(.4,0,.2,1);box-shadow:0 6px 24px rgba(217,119,6,0.5);opacity:1;transform:scale(1)`;
+        el.style.cssText = `position:fixed;top:${r.top + r.height / 3}px;left:${r.left + r.width / 2}px;width:48px;height:48px;border-radius:50%;background:linear-gradient(145deg,#D97706,#F59E0B);z-index:9999;pointer-events:none;transition:all .75s cubic-bezier(.4,0,.2,1);box-shadow:0 8px 32px rgba(217,119,6,0.6);opacity:1;transform:scale(1)`;
         document.body.appendChild(el);
         requestAnimationFrame(() => {
-          el.style.top = `${br.top + br.height / 2 - 22}px`;
-          el.style.left = `${br.left + br.width / 2 - 22}px`;
+          el.style.top = `${br.top + br.height / 2 - 24}px`;
+          el.style.left = `${br.left + br.width / 2 - 24}px`;
           el.style.opacity = '0';
-          el.style.transform = 'scale(0.12)';
+          el.style.transform = 'scale(0.08)';
         });
-        setTimeout(() => el.remove(), 750);
+        setTimeout(() => el.remove(), 850);
       }
     }
   };
@@ -41,10 +54,10 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
     const rect = card.getBoundingClientRect();
     const ripple = document.createElement('span');
     ripple.className = 'qr-ripple';
-    const size = Math.max(rect.width, rect.height);
-    ripple.style.width = ripple.style.height = `${size}px`;
-    ripple.style.left = `${e.clientX - rect.left - size / 2}px`;
-    ripple.style.top = `${e.clientY - rect.top - size / 2}px`;
+    const s = Math.max(rect.width, rect.height);
+    ripple.style.width = ripple.style.height = `${s}px`;
+    ripple.style.left = `${e.clientX - rect.left - s / 2}px`;
+    ripple.style.top = `${e.clientY - rect.top - s / 2}px`;
     card.appendChild(ripple);
     setTimeout(() => ripple.remove(), 600);
   };
@@ -55,14 +68,25 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
     <motion.div
       ref={ref}
       className={`qr-card ${size}`}
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 36 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-30px' }}
-      transition={{ delay: (index % 4) * 0.06, duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ delay: (index % 4) * 0.07, duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
+      style={{ transform: `perspective(800px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)` }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       onClick={e => { handleRipple(e); onDetail(item); }}
     >
       <div className="qr-card-img-wrap">
-        <img className="qr-card-img" src={item.image} alt={item.name} loading="lazy" />
+        {!imgLoaded && <div className="qr-img-placeholder" />}
+        <img
+          className="qr-card-img"
+          src={item.image}
+          alt={item.name}
+          loading="lazy"
+          onLoad={() => setImgLoaded(true)}
+          style={{ opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.6s ease' }}
+        />
 
         {item.badge && (
           <span className={`qr-card-badge ${item.badge === 'Popular' ? 'pop' : item.badge === "Chef's Pick" ? 'chef' : item.badge === 'Vegan' ? 'vegan' : 'pop'}`}>
@@ -96,7 +120,7 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
           {item.rating && <span className="qr-card-rating">★ {item.rating}</span>}
           {item.prepTime && (
             <span className="qr-card-time">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
               {item.prepTime}
             </span>
           )}
@@ -109,7 +133,7 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
             ${item.price.toFixed(2)}
             {hasDiscount && <span className="old">${item.originalPrice.toFixed(2)}</span>}
           </div>
-          <motion.div className="qr-stepper" animate={justAdded ? { scale: [1, 1.1, 1] } : {}} transition={{ duration: 0.3 }}>
+          <motion.div className="qr-stepper" animate={justAdded ? { scale: [1, 1.14, 1] } : {}} transition={{ duration: 0.3 }}>
             {cartQty > 0 ? (
               <>
                 <button onClick={e => { e.stopPropagation(); onRemove(item.id); }}>−</button>

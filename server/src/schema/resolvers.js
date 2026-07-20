@@ -145,7 +145,7 @@ const resolvers = {
                 }
                 
                 const itemsResult = await pool.query(
-                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category, mi.description, mi.image_url
+                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category, mi.description, mi.image_url, mi.cafe_id
                      FROM cart_items ci
                      JOIN menu_items mi ON ci.menu_item_id = mi.id
                      WHERE ci.cart_id = $1 AND mi.deleted_at IS NULL`,
@@ -477,11 +477,46 @@ const resolvers = {
         }
     },
     
+    CartItem: {
+        menu_item: (cartItem) => ({
+            id: cartItem.menu_item_id,
+            name: cartItem.name,
+            price: cartItem.current_price,
+            category: cartItem.category,
+            description: cartItem.description,
+            image_url: cartItem.image_url,
+            cafe_id: cartItem.cafe_id,
+        }),
+    },
+    
+    OrderItem: {
+        menu_item: (orderItem) => ({
+            id: orderItem.menu_item_id,
+            name: orderItem.name,
+            price: orderItem.current_price,
+            category: orderItem.category,
+        }),
+    },
+    
     Order: {
         cafe: async (order) => {
             try {
                 const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
                 return result.rows[0];
+            } catch (error) {
+                return null;
+            }
+        },
+        student: async (order) => {
+            try {
+                const result = await pool.query(
+                    `SELECT s.*, u.username, u.email
+                     FROM students s
+                     JOIN users u ON s.user_id = u.id
+                     WHERE s.id = $1 AND u.deleted_at IS NULL`,
+                    [order.student_id]
+                );
+                return result.rows[0] || null;
             } catch (error) {
                 return null;
             }
@@ -516,6 +551,45 @@ const resolvers = {
                 return null;
             }
         }
+    },
+
+    Delivery: {
+        order: async (delivery) => {
+            try {
+                const result = await pool.query(
+                    `SELECT o.*, c.name as cafe_name, c.location as cafe_location
+                     FROM orders o
+                     JOIN cafes c ON o.cafe_id = c.id
+                     WHERE o.id = $1 AND o.deleted_at IS NULL`,
+                    [delivery.order_id]
+                );
+                return result.rows[0] || null;
+            } catch (error) {
+                return null;
+            }
+        },
+        delivery_person: async (delivery) => {
+            try {
+                const result = await pool.query(
+                    'SELECT id, username, email, phone, role FROM users WHERE id = $1',
+                    [delivery.delivery_person_id]
+                );
+                return result.rows[0] || null;
+            } catch (error) {
+                return null;
+            }
+        },
+        assigner: async (delivery) => {
+            try {
+                const result = await pool.query(
+                    'SELECT id, username, email, phone, role FROM users WHERE id = $1',
+                    [delivery.assigned_by]
+                );
+                return result.rows[0] || null;
+            } catch (error) {
+                return null;
+            }
+        },
     },
     
     // ============== MUTATION RESOLVERS ==============
@@ -653,7 +727,7 @@ const resolvers = {
                 }
                 
                 const itemsResult = await pool.query(
-                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category
+                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category, mi.cafe_id
                      FROM cart_items ci
                      JOIN menu_items mi ON ci.menu_item_id = mi.id
                      WHERE ci.cart_id = $1 AND mi.deleted_at IS NULL`,
@@ -710,7 +784,7 @@ const resolvers = {
                 const cart = cartResult.rows[0];
 
                 const itemsResult = await pool.query(
-                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category
+                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category, mi.cafe_id
                      FROM cart_items ci
                      JOIN menu_items mi ON ci.menu_item_id = mi.id
                      WHERE ci.cart_id = $1 AND mi.deleted_at IS NULL`,
@@ -753,7 +827,7 @@ const resolvers = {
                 const cart = cartResult.rows[0];
 
                 const itemsResult = await pool.query(
-                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category
+                    `SELECT ci.*, mi.name, mi.price as current_price, mi.category, mi.cafe_id
                      FROM cart_items ci
                      JOIN menu_items mi ON ci.menu_item_id = mi.id
                      WHERE ci.cart_id = $1 AND mi.deleted_at IS NULL`,
