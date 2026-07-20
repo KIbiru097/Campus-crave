@@ -1,110 +1,72 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function CartBubble({ items, onUpdateQty, onRemove, onCheckout, menuItems }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
-  const totalPrice = items.reduce((sum, i) => {
-    const menuItem = menuItems.find(m => m.id === i.id);
-    return sum + (menuItem ? menuItem.price * i.quantity : 0);
-  }, 0);
+export default function CartBubble({ items, onUpdateQty, onRemove, onCheckout, menuItems, openCart, onOpenCartChange }) {
+  const totalItems = items.reduce((s, i) => s + i.quantity, 0);
+  const total = items.reduce((s, i) => { const m = menuItems.find(x => x.id === i.id); return s + (m ? m.price * i.quantity : 0); }, 0);
+  const tax = total * 0.08;
 
   return (
     <>
       <AnimatePresence>
-        {expanded && (
+        {openCart && (
           <>
-            <motion.div
-              className="qr-sheet-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setExpanded(false)}
-            />
-            <motion.div
-              className="qr-sheet"
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              drag="y"
-              dragConstraints={{ top: 0 }}
-              dragElastic={0.2}
-              onDragEnd={(_, info) => {
-                if (info.velocity.y > 200 || info.offset.y > 200) {
-                  setExpanded(false);
-                }
-              }}
-            >
-              <div className="qr-sheet-handle" />
-              <div className="qr-sheet-header">
-                <h2 className="qr-sheet-title">Your Order</h2>
-                <button className="qr-sheet-close" onClick={() => setExpanded(false)}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
+            <motion.div className="qr-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => onOpenCartChange(false)} />
+            <motion.div className="qr-sheet" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 32, stiffness: 320 }} drag="y" dragConstraints={{ top: 0 }} dragElastic={0.15} onDragEnd={(_, info) => { if (info.velocity.y > 180 || info.offset.y > 180) onOpenCartChange(false); }}>
+              <div className="qr-handle" />
+              <div className="qr-sheet-head">
+                <div>
+                  <h2 className="qr-sheet-title">Your Order</h2>
+                  <p style={{ fontSize: 12, color: 'var(--qr-dim)', marginTop: 2 }}>{totalItems} item{totalItems !== 1 ? 's' : ''}</p>
+                </div>
+                <motion.button className="qr-sheet-x" onClick={() => onOpenCartChange(false)} whileTap={{ scale: 0.9 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </motion.button>
               </div>
 
               {items.length === 0 ? (
                 <div className="qr-cart-empty">
-                  <div className="qr-cart-empty-icon">🛒</div>
-                  <p className="qr-cart-empty-text">Your order is empty</p>
+                  <motion.div className="icon" initial={{ scale: 0.8 }} animate={{ scale: 1 }}>🛒</motion.div>
+                  <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>Your order is empty</motion.p>
+                  <p className="sub">Browse the menu and add items</p>
                 </div>
               ) : (
                 <>
                   <div className="qr-cart-items">
-                    {items.map((cartItem) => {
-                      const menuItem = menuItems.find(m => m.id === cartItem.id);
-                      if (!menuItem) return null;
-                      return (
-                        <div key={cartItem.id} className="qr-cart-item">
-                          <img className="qr-cart-item-img" src={menuItem.image} alt={menuItem.name} />
-                          <div className="qr-cart-item-info">
-                            <div className="qr-cart-item-name">{menuItem.name}</div>
-                            <div className="qr-cart-item-meta">
-                              {cartItem.size && `${cartItem.size} · `}
-                              ${menuItem.price.toFixed(2)} each
+                    <AnimatePresence>
+                      {items.map((ci, idx) => {
+                        const m = menuItems.find(x => x.id === ci.id);
+                        if (!m) return null;
+                        return (
+                          <motion.div key={ci.id} className="qr-cart-row" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20, height: 0, paddingTop: 0, paddingBottom: 0 }} transition={{ delay: idx * 0.04 }}>
+                            <img src={m.image} alt={m.name} />
+                            <div className="info">
+                              <div className="name">{m.name}</div>
+                              <div className="meta">{ci.size && `${ci.size} · `}{ci.milk && `${ci.milk} · `}${m.price.toFixed(2)} each</div>
                             </div>
-                          </div>
-                          <div className="qr-cart-item-controls">
-                            <div className="qr-cart-item-qty">
-                              <button onClick={() => onUpdateQty(cartItem.id, -1)}>−</button>
-                              <span>{cartItem.quantity}</span>
-                              <button onClick={() => onUpdateQty(cartItem.id, 1)}>+</button>
+                            <div className="ctrls">
+                              <div className="qr-cart-qty">
+                                <motion.button whileTap={{ scale: 0.8 }} onClick={() => onUpdateQty(ci.id, -1)}>−</motion.button>
+                                <motion.span key={ci.quantity} initial={{ scale: 1.3 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500 }}>{ci.quantity}</motion.span>
+                                <motion.button whileTap={{ scale: 0.8 }} onClick={() => onUpdateQty(ci.id, 1)}>+</motion.button>
+                              </div>
+                              <span className="amt">${(m.price * ci.quantity).toFixed(2)}</span>
                             </div>
-                            <span className="qr-cart-item-price">
-                              ${(menuItem.price * cartItem.quantity).toFixed(2)}
-                            </span>
-                          </div>
-                          <button className="qr-cart-item-remove" onClick={() => onRemove(cartItem.id)}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          </button>
-                        </div>
-                      );
-                    })}
+                            <motion.button className="rm" onClick={() => onRemove(ci.id)} whileTap={{ scale: 0.85 }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </motion.button>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
                   </div>
-
-                  <div className="qr-cart-footer">
-                    <div className="qr-cart-summary">
-                      <div className="qr-cart-summary-row">
-                        <span>Subtotal</span>
-                        <span>${totalPrice.toFixed(2)}</span>
-                      </div>
-                      <div className="qr-cart-summary-row">
-                        <span>Tax (8%)</span>
-                        <span>${(totalPrice * 0.08).toFixed(2)}</span>
-                      </div>
-                      <div className="qr-cart-summary-row total">
-                        <span>Total</span>
-                        <span>${(totalPrice * 1.08).toFixed(2)}</span>
-                      </div>
+                  <div className="qr-cart-foot">
+                    <div className="qr-cart-sum">
+                      <div className="qr-cart-row-sum"><span>Subtotal</span><span>${total.toFixed(2)}</span></div>
+                      <div className="qr-cart-row-sum"><span>Tax (8%)</span><span>${tax.toFixed(2)}</span></div>
+                      <div className="qr-cart-row-sum total"><span>Total</span><span>${(total + tax).toFixed(2)}</span></div>
                     </div>
-                    <button
-                      className="qr-cart-checkout-btn"
-                      onClick={() => { setExpanded(false); onCheckout(); }}
-                    >
-                      Send to Kitchen — ${(totalPrice * 1.08).toFixed(2)}
-                    </button>
+                    <motion.button className="qr-checkout-btn" onClick={() => { onOpenCartChange(false); onCheckout(); }} whileTap={{ scale: 0.97 }} whileHover={{ y: -1 }}>Send to Kitchen — ${(total + tax).toFixed(2)}</motion.button>
                   </div>
                 </>
               )}
@@ -113,29 +75,11 @@ export default function CartBubble({ items, onUpdateQty, onRemove, onCheckout, m
         )}
       </AnimatePresence>
 
-      <div className="qr-cart-bubble" style={{ display: totalItems > 0 ? 'block' : 'none' }}>
-        <motion.button
-          className="qr-cart-btn"
-          onClick={() => setExpanded(true)}
-          whileTap={{ scale: 0.9 }}
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 0.3 }}
-          key={totalItems}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-          </svg>
-          <motion.span
-            className="qr-cart-count"
-            key={totalItems}
-            initial={{ scale: 1.5 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-          >
-            {totalItems}
-          </motion.span>
-          <span className="qr-cart-total">${totalPrice.toFixed(2)}</span>
+      <div className="qr-cart-pos" style={{ display: totalItems > 0 ? 'block' : 'none' }}>
+        <motion.button className="qr-cart-orb" onClick={() => onOpenCartChange(true)} whileTap={{ scale: 0.88 }} animate={totalItems > 0 ? { scale: [1, 1.12, 1] } : {}} transition={{ duration: 0.35 }} key={totalItems}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>
+          <motion.span className="badge" key={totalItems} initial={{ scale: 1.6 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 12 }}>{totalItems}</motion.span>
+          <motion.span className="price-pill" key={`t-${total.toFixed(2)}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>${total.toFixed(2)}</motion.span>
         </motion.button>
       </div>
     </>

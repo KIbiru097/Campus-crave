@@ -216,7 +216,7 @@ const styles = {
         alignItems: 'center',
         minHeight: '80vh',
         padding: '20px',
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#FFFDF9',
     },
     card: {
         background: 'white',
@@ -229,15 +229,15 @@ const styles = {
     title: {
         textAlign: 'center',
         marginBottom: '10px',
-        color: '#2c3e50',
+        color: '#2C2A28',
     },
     subtitle: {
         textAlign: 'center',
-        color: '#666',
+        color: '#2C2A28',
         marginBottom: '30px',
     },
     orderInfo: {
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#FFFDF9',
         padding: '15px',
         borderRadius: '10px',
         marginBottom: '25px',
@@ -248,7 +248,7 @@ const styles = {
         padding: '8px 0',
     },
     partialAmount: {
-        color: '#f39c12',
+        color: '#FFB84D',
     },
     formGroup: {
         marginBottom: '15px',
@@ -268,7 +268,7 @@ const styles = {
     demoNote: {
         marginTop: '20px',
         padding: '15px',
-        backgroundColor: '#e8f4fd',
+        backgroundColor: '#FFF3E0',
         borderRadius: '10px',
         fontSize: '12px',
         textAlign: 'center',
@@ -277,7 +277,7 @@ const styles = {
         width: '100%',
         marginTop: '20px',
         padding: '14px',
-        backgroundColor: '#27ae60',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -290,7 +290,7 @@ const styles = {
         marginTop: '10px',
         padding: '12px',
         backgroundColor: 'transparent',
-        color: '#666',
+        color: '#2C2A28',
         border: '1px solid #ddd',
         borderRadius: '8px',
         cursor: 'pointer',
@@ -312,7 +312,7 @@ const styles = {
     checkmark: {
         width: '80px',
         height: '80px',
-        backgroundColor: '#27ae60',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         borderRadius: '50%',
         fontSize: '50px',
@@ -320,24 +320,24 @@ const styles = {
         margin: '0 auto 20px',
     },
     successTitle: {
-        color: '#27ae60',
+        color: '#FF7A3D',
         marginBottom: '15px',
     },
     details: {
         margin: '20px 0',
         padding: '15px',
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#FFFDF9',
         borderRadius: '10px',
         textAlign: 'left',
     },
     paidStatus: {
-        color: '#27ae60',
+        color: '#FF7A3D',
         fontWeight: 'bold',
     },
     button: {
         marginTop: '20px',
         padding: '12px 30px',
-        backgroundColor: '#3498db',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',

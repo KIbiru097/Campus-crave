@@ -57,25 +57,25 @@ const Home = () => {
     return (
         <div style={styles.container}>
             {/* Hero Section */}
-            <div style={styles.hero}>
+            <div style={styles.hero} className="cc-hero">
                 <div style={styles.heroContent}>
-                    <div style={styles.foodAnimation}>
+                    <div style={styles.foodAnimation} className="cc-food-anim">
                         <span style={styles.flyingFood}>🍕</span>
                         <span style={styles.flyingFood2}>🍔</span>
                         <span style={styles.flyingFood3}>☕</span>
                         <span style={styles.flyingFood4}>🥗</span>
                     </div>
-                    <h1 style={styles.heroTitle}>
-                        <span style={styles.heroEmoji}>🍽️</span>
+                    <h1 style={styles.heroTitle} className="cc-hero-title">
+                        <span style={styles.heroEmoji} className="cc-hero-emoji">🍽️</span>
                         Campus Crave
-                        <span style={styles.heroEmoji}>✨</span>
+                        <span style={styles.heroEmoji} className="cc-hero-emoji">✨</span>
                     </h1>
-                    <p style={styles.heroText}>
+                    <p style={styles.heroText} className="cc-hero-text">
                         Your favorite campus cafes, now at your fingertips.
                         Order ahead, skip the line, and enjoy more time with friends.
                     </p>
                     {!user && (
-                        <div style={styles.heroButtons}>
+                        <div style={styles.heroButtons} className="cc-hero-buttons">
                             <Link to="/register">
                                 <button style={styles.primaryBtn}>Get Started ✨</button>
                             </Link>
@@ -103,7 +103,7 @@ const Home = () => {
             </div>
 
             {/* Stats Section */}
-            <div style={styles.statsSection}>
+            <div style={styles.statsSection} className="cc-stats-section">
                 <div style={styles.stat}>
                     <div style={styles.statIcon}>🏪</div>
                     <h3>{cafes.length}+</h3>
@@ -127,17 +127,17 @@ const Home = () => {
             </div>
 
             {/* Popular Dishes Section - Fetched from Database */}
-            <div style={styles.featuredSection}>
-                <h2 style={styles.sectionTitle}>🔥 Popular Dishes</h2>
+            <div style={styles.featuredSection} className="cc-section">
+                <h2 style={styles.sectionTitle} className="cc-section-title">🔥 Popular Dishes</h2>
                 {menuLoading ? (
                     <div style={styles.loadingContainer}>
                         <div className="skeleton" style={{ width: '100%', height: '200px', borderRadius: '16px' }}></div>
                     </div>
                 ) : (
-                    <div style={styles.featuredGrid}>
+                    <div style={styles.featuredGrid} className="cc-featured-grid">
                         {popularItems.map((item, index) => (
-                            <div key={item.id} style={styles.featuredCard}>
-                                <div style={styles.foodImage}>{getFoodEmoji(item.category)}</div>
+                            <div key={item.id} style={styles.featuredCard} className="cc-featured-card">
+                                <div style={styles.foodImage} className="cc-food-emoji">{getFoodEmoji(item.category)}</div>
                                 <h4>{item.name}</h4>
                                 <p>{item.category}</p>
                                 <span style={styles.foodPrice}>ETB {item.price}</span>
@@ -151,9 +151,9 @@ const Home = () => {
             </div>
 
             {/* Features Section */}
-            <div style={styles.featuresSection}>
-                <h2 style={styles.sectionTitle}>Why Choose Campus Crave?</h2>
-                <div style={styles.featuresGrid}>
+            <div style={styles.featuresSection} className="cc-section">
+                <h2 style={styles.sectionTitle} className="cc-section-title">Why Choose Campus Crave?</h2>
+                <div style={styles.featuresGrid} className="cc-features-grid">
                     <div style={styles.featureCard}>
                         <div style={styles.featureIcon}>⚡</div>
                         <h4>Fast Delivery</h4>
@@ -178,9 +178,9 @@ const Home = () => {
             </div>
 
             {/* Cafes Section */}
-            <div style={styles.cafesSection}>
-                <h2 style={styles.sectionTitle}>📍 Our Cafes</h2>
-                <div style={styles.cafesGrid}>
+            <div style={styles.cafesSection} className="cc-section">
+                <h2 style={styles.sectionTitle} className="cc-section-title">📍 Our Cafes</h2>
+                <div style={styles.cafesGrid} className="cc-cafes-grid">
                     {cafes.slice(0, 4).map((cafe) => (
                         <Link to={`/cafe/${cafe.id}`} key={cafe.id} style={styles.cafeCardLink}>
                             <div style={styles.cafeCard}>
@@ -205,7 +205,7 @@ const Home = () => {
             </div>
 
             {/* Call to Action */}
-            <div style={styles.ctaSection}>
+            <div style={styles.ctaSection} className="cc-cta-section">
                 <h2>Ready to Crave?</h2>
                 <p>Join thousands of students enjoying delicious meals from campus cafes</p>
                 {!user && (
@@ -221,10 +221,10 @@ const Home = () => {
 const styles = {
     container: {
         minHeight: '100vh',
-        backgroundColor: '#fffef7',
+        backgroundColor: '#FFFDF9',
     },
     hero: {
-        background: 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)',
+        background: 'linear-gradient(135deg, #E8532B 0%, #FF7A3D 100%)',
         padding: '80px 20px',
         position: 'relative',
         overflow: 'hidden',
@@ -299,7 +299,7 @@ const styles = {
         padding: '12px 32px',
         fontSize: '16px',
         background: 'white',
-        color: '#2d6a4f',
+        color: '#E8532B',
         border: 'none',
         borderRadius: '50px',
         cursor: 'pointer',
@@ -348,7 +348,7 @@ const styles = {
         justifyContent: 'space-around',
         flexWrap: 'wrap',
         padding: '40px 20px',
-        backgroundColor: '#d8f3dc',
+        backgroundColor: '#FFE0C4',
         marginTop: '-30px',
         marginLeft: '20px',
         marginRight: '20px',
@@ -369,7 +369,7 @@ const styles = {
     sectionTitle: {
         textAlign: 'center',
         fontSize: '32px',
-        color: '#2d6a4f',
+        color: '#E8532B',
         marginBottom: '40px',
     },
     featuredGrid: {
@@ -384,7 +384,7 @@ const styles = {
         borderRadius: '20px',
         padding: '20px',
         textAlign: 'center',
-        boxShadow: '0 5px 20px rgba(45,106,79,0.1)',
+        boxShadow: '0 5px 20px rgba(232,83,43,0.1)',
         transition: 'transform 0.3s',
     },
     foodImage: {
@@ -395,15 +395,15 @@ const styles = {
         display: 'inline-block',
         marginTop: '10px',
         padding: '5px 15px',
-        backgroundColor: '#d8f3dc',
-        color: '#2d6a4f',
+        backgroundColor: '#FFE0C4',
+        color: '#E8532B',
         borderRadius: '20px',
         fontWeight: 'bold',
     },
     orderBtn: {
         marginTop: '12px',
         padding: '6px 16px',
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '20px',
@@ -412,7 +412,7 @@ const styles = {
     },
     featuresSection: {
         padding: '60px 20px',
-        backgroundColor: '#f0fdf4',
+        backgroundColor: '#FFF3E0',
     },
     featuresGrid: {
         display: 'grid',
@@ -451,7 +451,7 @@ const styles = {
         borderRadius: '16px',
         padding: '20px',
         textAlign: 'center',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         transition: 'transform 0.3s',
     },
     cafeIcon: {
@@ -471,8 +471,8 @@ const styles = {
     viewAllBtn: {
         padding: '10px 30px',
         backgroundColor: 'transparent',
-        border: '2px solid #2d6a4f',
-        color: '#2d6a4f',
+        border: '2px solid #E8532B',
+        color: '#E8532B',
         borderRadius: '30px',
         cursor: 'pointer',
         fontSize: '14px',
@@ -481,7 +481,7 @@ const styles = {
     ctaSection: {
         textAlign: 'center',
         padding: '60px 20px',
-        background: 'linear-gradient(135deg, #2d6a4f 0%, #52b788 100%)',
+        background: 'linear-gradient(135deg, #E8532B 0%, #FF7A3D 100%)',
         color: 'white',
     },
     ctaBtn: {
@@ -489,7 +489,7 @@ const styles = {
         padding: '12px 32px',
         fontSize: '16px',
         background: 'white',
-        color: '#2d6a4f',
+        color: '#E8532B',
         border: 'none',
         borderRadius: '50px',
         cursor: 'pointer',
@@ -511,13 +511,37 @@ if (!document.getElementById('home-animations')) {
             50% { transform: translateY(-20px); }
         }
         .skeleton {
-            background: linear-gradient(90deg, #d8f3dc 25%, #fffef7 50%, #d8f3dc 75%);
+            background: linear-gradient(90deg, #FFE0C4 25%, #FFFDF9 50%, #FFE0C4 75%);
             background-size: 1000px 100%;
             animation: shimmer 2s infinite;
         }
         @keyframes shimmer {
             0% { background-position: -1000px 0; }
             100% { background-position: 1000px 0; }
+        }
+        @media (max-width: 768px) {
+            .cc-hero-title { font-size: 28px !important; }
+            .cc-hero-emoji { font-size: 28px !important; }
+            .cc-hero-text { font-size: 15px !important; }
+            .cc-hero { padding: 50px 16px !important; }
+            .cc-food-anim { display: none !important; }
+            .cc-stats-section { margin-left: 10px !important; margin-right: 10px !important; padding: 24px 12px !important; border-radius: 20px !important; }
+            .cc-stat { min-width: auto !important; flex: 1 0 40% !important; padding: 10px 8px !important; }
+            .cc-stat h3 { font-size: 20px !important; }
+            .cc-section-title { font-size: 22px !important; margin-bottom: 24px !important; }
+            .cc-section { padding: 40px 16px !important; }
+            .cc-featured-card { padding: 14px !important; }
+            .cc-food-emoji { font-size: 44px !important; }
+            .cc-cta-section { padding: 40px 16px !important; }
+        }
+        @media (max-width: 480px) {
+            .cc-hero-title { font-size: 22px !important; }
+            .cc-hero-buttons { flex-direction: column !important; align-items: center !important; }
+            .cc-hero-buttons button { width: 100% !important; max-width: 260px !important; }
+            .cc-features-grid { grid-template-columns: 1fr !important; }
+            .cc-cafes-grid { grid-template-columns: 1fr !important; }
+            .cc-featured-grid { grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
+            .cc-stat { flex: 1 0 45% !important; }
         }
     `;
     document.head.appendChild(styleSheet);

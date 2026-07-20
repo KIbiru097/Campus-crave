@@ -89,12 +89,12 @@ const styles = {
     title: {
         fontSize: '1.8rem',
         fontWeight: 'bold',
-        color: '#2d6a4f',
+        color: '#E8532B',
         marginBottom: '0.5rem',
     },
     subtitle: {
         fontSize: '1rem',
-        color: '#52b788',
+        color: '#FFB84D',
     },
     grid: {
         display: 'grid',
@@ -106,12 +106,12 @@ const styles = {
         color: 'inherit',
     },
     card: {
-        background: '#fffef7',
+        background: '#FFFDF9',
         borderRadius: '16px',
         padding: '1.25rem',
-        boxShadow: '0 4px 15px rgba(45, 106, 79, 0.1)',
+        boxShadow: '0 4px 15px rgba(232, 83, 43, 0.1)',
         transition: 'all 0.3s ease',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
     },
     cardIcon: {
         textAlign: 'center',
@@ -123,12 +123,12 @@ const styles = {
     cafeName: {
         fontSize: '1.25rem',
         fontWeight: 'bold',
-        color: '#1b4332',
+        color: '#E8532B',
         marginBottom: '0.5rem',
         textAlign: 'center',
     },
     description: {
-        color: '#52b788',
+        color: '#FFB84D',
         lineHeight: '1.5',
         marginBottom: '0.75rem',
         textAlign: 'center',
@@ -138,7 +138,7 @@ const styles = {
         display: 'flex',
         justifyContent: 'space-between',
         fontSize: '0.75rem',
-        color: '#74c69d',
+        color: '#FFB84D',
         marginBottom: '0.75rem',
         flexWrap: 'wrap',
         gap: '0.5rem',
@@ -159,7 +159,7 @@ const styles = {
     },
     openBadge: {
         display: 'inline-block',
-        background: '#2d6a4f',
+        background: '#FF7A3D',
         color: 'white',
         padding: '0.25rem 1rem',
         borderRadius: '20px',
@@ -171,15 +171,15 @@ const styles = {
     },
     closedBadge: {
         display: 'inline-block',
-        background: '#d8f3dc',
-        color: '#2d6a4f',
+        background: '#FFE0C4',
+        color: '#E8532B',
         padding: '0.25rem 1rem',
         borderRadius: '20px',
         fontSize: '0.75rem',
     },
     viewMore: {
         textAlign: 'center',
-        color: '#52b788',
+        color: '#FFB84D',
         fontWeight: '600',
         fontSize: '0.85rem',
     },
@@ -192,10 +192,10 @@ const styles = {
     },
     errorCard: {
         textAlign: 'center',
-        background: '#fffef7',
+        background: '#FFFDF9',
         padding: '2rem',
         borderRadius: '16px',
-        boxShadow: '0 4px 15px rgba(45, 106, 79, 0.1)',
+        boxShadow: '0 4px 15px rgba(232, 83, 43, 0.1)',
     },
     errorIcon: {
         fontSize: '3rem',
@@ -204,7 +204,7 @@ const styles = {
     retryBtn: {
         marginTop: '1rem',
         padding: '0.5rem 1.5rem',
-        background: '#2d6a4f',
+        background: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '25px',

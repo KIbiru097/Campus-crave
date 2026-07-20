@@ -29,12 +29,12 @@ const Orders = () => {
     const getStatusColor = (status) => {
         switch (status?.toLowerCase()) {
             case 'pending': return '#f39c12';
-            case 'confirmed': return '#2d6a4f';
-            case 'preparing': return '#52b788';
-            case 'ready': return '#1b4332';
-            case 'delivered': return '#2d6a4f';
-            case 'cancelled': return '#d8f3dc';
-            default: return '#74c69d';
+            case 'confirmed': return '#E8532B';
+            case 'preparing': return '#FFB84D';
+            case 'ready': return '#E8532B';
+            case 'delivered': return '#FF7A3D';
+            case 'cancelled': return '#FFE0C4';
+            default: return '#FFB84D';
         }
     };
 
@@ -49,7 +49,7 @@ const Orders = () => {
                             <span style={{
                                 ...styles.statusBadge,
                                 backgroundColor: getStatusColor(order.order_status),
-                                color: order.order_status?.toLowerCase() === 'cancelled' ? '#2d6a4f' : 'white'
+                                color: order.order_status?.toLowerCase() === 'cancelled' ? '#E8532B' : 'white'
                             }}>
                                 {order.order_status}
                             </span>
@@ -83,7 +83,7 @@ const styles = {
     },
     title: {
         marginBottom: '1.5rem',
-        color: '#2d6a4f',
+        color: '#E8532B',
         fontSize: '1.5rem',
     },
     ordersList: {
@@ -92,11 +92,11 @@ const styles = {
         gap: '1rem',
     },
     orderCard: {
-        backgroundColor: '#fffef7',
+        backgroundColor: '#FFFDF9',
         borderRadius: '12px',
         padding: '1rem',
-        boxShadow: '0 2px 8px rgba(45, 106, 79, 0.1)',
-        border: '1px solid #d8f3dc',
+        boxShadow: '0 2px 8px rgba(232, 83, 43, 0.1)',
+        border: '1px solid #FFE0C4',
     },
     orderHeader: {
         display: 'flex',
@@ -104,7 +104,7 @@ const styles = {
         alignItems: 'center',
         marginBottom: '12px',
         paddingBottom: '8px',
-        borderBottom: '1px solid #d8f3dc',
+        borderBottom: '1px solid #FFE0C4',
         flexWrap: 'wrap',
         gap: '8px',
     },
@@ -121,7 +121,7 @@ const styles = {
     itemsSection: {
         marginTop: '8px',
         paddingTop: '8px',
-        borderTop: '1px solid #d8f3dc',
+        borderTop: '1px solid #FFE0C4',
     },
     orderItem: {
         display: 'flex',
@@ -132,7 +132,7 @@ const styles = {
     browseBtn: {
         marginTop: '15px',
         padding: '10px 25px',
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',

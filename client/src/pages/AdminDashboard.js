@@ -171,8 +171,8 @@ const AdminDashboard = () => {
     };
 
     const stats = [
-        { label: 'Total Cafes', value: cafes.length, icon: '🏪', color: '#2d6a4f' },
-        { label: 'Active Cafes', value: activeCafes.length, icon: '✅', color: '#52b788' },
+        { label: 'Total Cafes', value: cafes.length, icon: '🏪', color: '#E8532B' },
+        { label: 'Active Cafes', value: activeCafes.length, icon: '✅', color: '#FFB84D' },
         { label: 'Total Users', value: users.length, icon: '👥', color: '#3498db' },
         { label: 'Staff Members', value: staffUsers.length, icon: '👨‍🍳', color: '#9b59b6' },
         { label: 'In Trash', value: deletedCafes.length, icon: '🗑️', color: '#e74c3c' },
@@ -185,28 +185,55 @@ const AdminDashboard = () => {
             case 'owner': return '#f39c12';
             case 'staff': return '#3498db';
             case 'delivery': return '#9b59b6';
-            default: return '#2d6a4f';
+            default: return '#E8532B';
         }
     };
 
     return (
         <div style={styles.container}>
-            <h1 style={styles.title}>👑 Admin Dashboard</h1>
+            <style>{`
+                @media (max-width: 768px) {
+                    .cc-admin-tabs {
+                        overflow-x: auto !important;
+                        flex-wrap: nowrap !important;
+                        -webkit-overflow-scrolling: touch;
+                        scrollbar-width: none;
+                        padding-bottom: 4px;
+                    }
+                    .cc-admin-tabs::-webkit-scrollbar { display: none; }
+                    .cc-admin-tab {
+                        flex-shrink: 0;
+                        padding: 8px 14px !important;
+                        font-size: 13px !important;
+                        white-space: nowrap;
+                    }
+                    .cc-admin-title { font-size: 1.3rem !important; }
+                    .cc-admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+                    .cc-admin-cafe-grid { grid-template-columns: 1fr !important; }
+                    .cc-admin-quick-actions { flex-direction: column !important; }
+                    .cc-admin-quick-btn { width: 100% !important; }
+                }
+                @media (max-width: 480px) {
+                    .cc-admin-stats-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+                    .cc-admin-container { padding: 12px !important; }
+                }
+            `}</style>
+            <h1 style={styles.title} className="cc-admin-title">👑 Admin Dashboard</h1>
             <p style={styles.subtitle}>Manage cafes, users, staff, and system settings</p>
 
             {/* Tabs */}
-            <div style={styles.tabs}>
-                <button style={{...styles.tab, ...(activeTab === 'overview' && styles.activeTab)}} onClick={() => setActiveTab('overview')}>📊 Overview</button>
-                <button style={{...styles.tab, ...(activeTab === 'cafes' && styles.activeTab)}} onClick={() => setActiveTab('cafes')}>🏪 Cafes</button>
-                <button style={{...styles.tab, ...(activeTab === 'staff' && styles.activeTab)}} onClick={() => setActiveTab('staff')}>👥 Staff</button>
-                <button style={{...styles.tab, ...(activeTab === 'deleted' && styles.activeTab)}} onClick={() => setActiveTab('deleted')}>🗑️ Trash ({deletedCafes.length})</button>
-                <button style={{...styles.tab, ...(activeTab === 'users' && styles.activeTab)}} onClick={() => setActiveTab('users')}>👤 Users</button>
+            <div style={styles.tabs} className="cc-admin-tabs">
+                <button style={{...styles.tab, ...(activeTab === 'overview' && styles.activeTab)}} className="cc-admin-tab" onClick={() => setActiveTab('overview')}>📊 Overview</button>
+                <button style={{...styles.tab, ...(activeTab === 'cafes' && styles.activeTab)}} className="cc-admin-tab" onClick={() => setActiveTab('cafes')}>🏪 Cafes</button>
+                <button style={{...styles.tab, ...(activeTab === 'staff' && styles.activeTab)}} className="cc-admin-tab" onClick={() => setActiveTab('staff')}>👥 Staff</button>
+                <button style={{...styles.tab, ...(activeTab === 'deleted' && styles.activeTab)}} className="cc-admin-tab" onClick={() => setActiveTab('deleted')}>🗑️ Trash ({deletedCafes.length})</button>
+                <button style={{...styles.tab, ...(activeTab === 'users' && styles.activeTab)}} className="cc-admin-tab" onClick={() => setActiveTab('users')}>👤 Users</button>
             </div>
 
             {/* Overview Tab */}
             {activeTab === 'overview' && (
                 <div>
-                    <div style={styles.statsGrid}>
+                    <div style={styles.statsGrid} className="cc-admin-stats-grid">
                         {stats.map((stat, idx) => (
                             <div key={idx} style={styles.statCard}>
                                 <div style={styles.statIcon}>{stat.icon}</div>
@@ -217,10 +244,10 @@ const AdminDashboard = () => {
                     </div>
                     <div style={styles.section}>
                         <h3>Quick Actions</h3>
-                        <div style={styles.quickActions}>
-                            <button style={styles.quickBtn} onClick={() => setShowAddCafe(true)}>🏪 Register New Cafe</button>
-                            <button style={styles.quickBtn} onClick={() => setShowCreateStaff(true)}>👥 Create Staff Account</button>
-                            <button style={styles.quickBtn} onClick={() => setShowAssignOwner(true)}>👑 Assign Cafe Owner</button>
+                        <div style={styles.quickActions} className="cc-admin-quick-actions">
+                            <button style={styles.quickBtn} className="cc-admin-quick-btn" onClick={() => setShowAddCafe(true)}>🏪 Register New Cafe</button>
+                            <button style={styles.quickBtn} className="cc-admin-quick-btn" onClick={() => setShowCreateStaff(true)}>👥 Create Staff Account</button>
+                            <button style={styles.quickBtn} className="cc-admin-quick-btn" onClick={() => setShowAssignOwner(true)}>👑 Assign Cafe Owner</button>
                         </div>
                     </div>
                 </div>
@@ -233,7 +260,7 @@ const AdminDashboard = () => {
                         <h3>All Cafes</h3>
                         <button style={styles.addBtn} onClick={() => setShowAddCafe(true)}>+ Register Cafe</button>
                     </div>
-                    <div style={styles.cafeGrid}>
+                        <div style={styles.cafeGrid} className="cc-admin-cafe-grid">
                         {cafes.filter(c => !c.deleted_at).map(cafe => (
                             <div key={cafe.id} style={styles.cafeCard}>
                                 <div style={styles.cafeIcon}>🏪</div>
@@ -294,7 +321,7 @@ const AdminDashboard = () => {
             {activeTab === 'deleted' && (
                 <div>
                     <h3>Deleted Cafes (Restore Available)</h3>
-                    <div style={styles.cafeGrid}>
+                    <div style={styles.cafeGrid} className="cc-admin-cafe-grid">
                         {cafes.filter(c => c.deleted_at).map(cafe => (
                             <div key={cafe.id} style={{...styles.cafeCard, backgroundColor: '#fef3c7'}}>
                                 <div style={styles.cafeIcon}>🗑️</div>
@@ -419,11 +446,11 @@ const styles = {
         padding: '20px',
     },
     title: {
-        color: '#2d6a4f',
+        color: '#E8532B',
         marginBottom: '5px',
     },
     subtitle: {
-        color: '#52b788',
+        color: '#FFB84D',
         marginBottom: '30px',
     },
     unauthorized: {
@@ -440,7 +467,7 @@ const styles = {
         gap: '10px',
         marginBottom: '30px',
         flexWrap: 'wrap',
-        borderBottom: '2px solid #d8f3dc',
+        borderBottom: '2px solid #FFE0C4',
         paddingBottom: '10px',
     },
     tab: {
@@ -452,7 +479,7 @@ const styles = {
         transition: 'all 0.3s',
     },
     activeTab: {
-        background: '#2d6a4f',
+        background: '#FF7A3D',
         color: 'white',
     },
     statsGrid: {
@@ -466,7 +493,7 @@ const styles = {
         borderRadius: '16px',
         padding: '20px',
         textAlign: 'center',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
     },
     statIcon: {
         fontSize: '40px',
@@ -475,7 +502,7 @@ const styles = {
     statValue: {
         fontSize: '28px',
         fontWeight: 'bold',
-        color: '#2d6a4f',
+        color: '#E8532B',
     },
     statLabel: {
         fontSize: '14px',
@@ -499,7 +526,7 @@ const styles = {
     },
     quickBtn: {
         padding: '12px 24px',
-        background: '#2d6a4f',
+        background: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '10px',
@@ -508,7 +535,7 @@ const styles = {
     },
     addBtn: {
         padding: '8px 20px',
-        background: '#2d6a4f',
+        background: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -524,7 +551,7 @@ const styles = {
         borderRadius: '16px',
         padding: '20px',
         textAlign: 'center',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
     },
     cafeIcon: {
         fontSize: '48px',
@@ -627,14 +654,14 @@ const styles = {
         width: '100%',
         padding: '10px',
         marginBottom: '15px',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         borderRadius: '8px',
     },
     textarea: {
         width: '100%',
         padding: '10px',
         marginBottom: '15px',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         borderRadius: '8px',
     },
     modalActions: {
@@ -652,7 +679,7 @@ const styles = {
     },
     saveBtn: {
         padding: '8px 20px',
-        background: '#2d6a4f',
+        background: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '6px',

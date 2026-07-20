@@ -273,12 +273,12 @@ const styles = {
         padding: '20px',
     },
     title: {
-        color: '#2d6a4f',
+        color: '#E8532B',
         marginBottom: '5px',
         fontSize: '28px',
     },
     subtitle: {
-        color: '#52b788',
+        color: '#FFB84D',
         marginBottom: '30px',
     },
     unauthorized: {
@@ -303,19 +303,19 @@ const styles = {
         marginBottom: '25px',
         flexWrap: 'wrap',
         padding: '15px',
-        backgroundColor: '#f0fdf4',
+        backgroundColor: '#FFF3E0',
         borderRadius: '12px',
     },
     filterSelect: {
         padding: '8px 15px',
         borderRadius: '8px',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         fontSize: '14px',
         minWidth: '150px',
     },
     refreshBtn: {
         padding: '8px 20px',
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -332,12 +332,12 @@ const styles = {
         borderRadius: '12px',
         padding: '15px',
         textAlign: 'center',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
     },
     statNumber: {
         fontSize: '28px',
         fontWeight: 'bold',
-        color: '#2d6a4f',
+        color: '#E8532B',
     },
     statLabel: {
         fontSize: '12px',
@@ -362,7 +362,7 @@ const styles = {
         backgroundColor: 'white',
         borderRadius: '16px',
         padding: '20px',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
     },
     deliveryHeader: {
@@ -371,7 +371,7 @@ const styles = {
         alignItems: 'center',
         marginBottom: '15px',
         paddingBottom: '15px',
-        borderBottom: '1px solid #d8f3dc',
+        borderBottom: '1px solid #FFE0C4',
         flexWrap: 'wrap',
         gap: '10px',
     },
@@ -397,7 +397,7 @@ const styles = {
     },
     deliverySection: {
         padding: '10px',
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#FFFDF9',
         borderRadius: '12px',
     },
     itemsList: {
@@ -410,7 +410,7 @@ const styles = {
         justifyContent: 'flex-end',
         marginTop: '20px',
         paddingTop: '15px',
-        borderTop: '1px solid #d8f3dc',
+        borderTop: '1px solid #FFE0C4',
     },
     updateBtn: {
         padding: '8px 20px',

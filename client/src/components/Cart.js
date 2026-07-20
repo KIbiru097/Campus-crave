@@ -13,6 +13,32 @@ const Cart = () => {
     const [removeFromCart] = useMutation(REMOVE_FROM_CART);
     const [clearCart] = useMutation(CLEAR_CART);
 
+    useEffect(() => {
+        if (!document.getElementById('cart-responsive')) {
+            const style = document.createElement('style');
+            style.id = 'cart-responsive';
+            style.textContent = `
+                @media (max-width: 480px) {
+                    .cc-cart-item {
+                        flex-direction: column !important;
+                        align-items: flex-start !important;
+                    }
+                    .cc-cart-item-actions {
+                        width: 100% !important;
+                        justify-content: space-between !important;
+                    }
+                    .cc-action-buttons {
+                        flex-direction: column !important;
+                    }
+                    .cc-action-buttons button {
+                        width: 100% !important;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }, []);
+
     const getPaymentRules = (count) => {
         if (count >= 4 && count <= 6) {
             return {
@@ -130,12 +156,12 @@ const Cart = () => {
             
             <div style={styles.itemsContainer}>
                 {items.map((item) => (
-                    <div key={item.id} style={styles.cartItem}>
+                    <div key={item.id} style={styles.cartItem} className="cc-cart-item">
                         <div style={styles.itemDetails}>
                             <h4>{item.menu_item?.name}</h4>
                             <p style={styles.itemPrice}>ETB {item.unit_price} each</p>
                         </div>
-                        <div style={styles.itemActions}>
+                        <div style={styles.itemActions} className="cc-cart-item-actions">
                             <button 
                                 onClick={() => handleUpdateQuantity(item.id, item.quantity, -1)}
                                 style={styles.qtyBtn}
@@ -194,7 +220,7 @@ const Cart = () => {
                 </div>
             )}
 
-            <div style={styles.actionButtons}>
+            <div style={styles.actionButtons} className="cc-action-buttons">
                 <button onClick={handleClearCart} style={styles.clearBtn}>
                     Clear Cart
                 </button>
@@ -217,13 +243,13 @@ const styles = {
     },
     title: {
         marginBottom: '1.5rem',
-        color: '#2d6a4f',
+        color: '#E8532B',
         fontSize: '1.5rem',
-        borderBottom: '2px solid #d8f3dc',
+        borderBottom: '2px solid #FFE0C4',
         paddingBottom: '0.5rem',
     },
     itemsContainer: {
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         borderRadius: '12px',
         overflow: 'hidden',
         marginBottom: '1rem',
@@ -233,8 +259,8 @@ const styles = {
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '1rem',
-        borderBottom: '1px solid #d8f3dc',
-        backgroundColor: '#fffef7',
+        borderBottom: '1px solid #FFE0C4',
+        backgroundColor: '#FFFDF9',
         flexWrap: 'wrap',
         gap: '0.75rem',
     },
@@ -243,7 +269,7 @@ const styles = {
     },
     itemPrice: {
         fontSize: '0.75rem',
-        color: '#52b788',
+        color: '#FFB84D',
         marginTop: '4px',
     },
     itemActions: {
@@ -255,7 +281,7 @@ const styles = {
     qtyBtn: {
         width: '28px',
         height: '28px',
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '6px',
@@ -272,12 +298,12 @@ const styles = {
     itemTotal: {
         minWidth: '70px',
         fontWeight: 'bold',
-        color: '#2d6a4f',
+        color: '#E8532B',
         fontSize: '14px',
     },
     removeBtn: {
-        backgroundColor: '#d8f3dc',
-        color: '#2d6a4f',
+        backgroundColor: '#FFE0C4',
+        color: '#E8532B',
         border: 'none',
         padding: '4px 10px',
         borderRadius: '6px',
@@ -285,18 +311,18 @@ const styles = {
         fontSize: '12px',
     },
     summaryCard: {
-        backgroundColor: '#fffef7',
+        backgroundColor: '#FFFDF9',
         borderRadius: '12px',
         padding: '1rem',
         marginBottom: '1rem',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
     },
     summaryRow: {
         display: 'flex',
         justifyContent: 'space-between',
         padding: '6px 0',
         fontSize: '14px',
-        color: '#52b788',
+        color: '#FFB84D',
     },
     summaryRowTotal: {
         display: 'flex',
@@ -304,21 +330,21 @@ const styles = {
         padding: '8px 0',
         fontSize: '16px',
         fontWeight: 'bold',
-        color: '#2d6a4f',
+        color: '#E8532B',
     },
     divider: {
         height: '1px',
-        backgroundColor: '#d8f3dc',
+        backgroundColor: '#FFE0C4',
         margin: '8px 0',
     },
     rulesCard: {
-        backgroundColor: '#d8f3dc',
+        backgroundColor: '#FFE0C4',
         borderRadius: '12px',
         padding: '0.75rem',
         marginBottom: '1rem',
     },
     warning: {
-        color: '#2d6a4f',
+        color: '#E8532B',
         fontWeight: 'bold',
         marginTop: '4px',
         fontSize: '12px',
@@ -331,8 +357,8 @@ const styles = {
     },
     clearBtn: {
         padding: '10px 20px',
-        backgroundColor: '#d8f3dc',
-        color: '#2d6a4f',
+        backgroundColor: '#FFE0C4',
+        color: '#E8532B',
         border: 'none',
         borderRadius: '8px',
         cursor: 'pointer',
@@ -341,7 +367,7 @@ const styles = {
     },
     checkoutBtn: {
         padding: '10px 25px',
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -360,7 +386,7 @@ const styles = {
     browseBtn: {
         marginTop: '15px',
         padding: '10px 25px',
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',

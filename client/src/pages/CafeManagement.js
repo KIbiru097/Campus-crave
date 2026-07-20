@@ -445,12 +445,12 @@ const styles = {
         padding: '20px',
     },
     title: {
-        color: '#2d6a4f',
+        color: '#E8532B',
         marginBottom: '5px',
         fontSize: '28px',
     },
     subtitle: {
-        color: '#52b788',
+        color: '#FFB84D',
         marginBottom: '30px',
     },
     unauthorized: {
@@ -482,7 +482,7 @@ const styles = {
     cafeSelector: {
         marginBottom: '30px',
         padding: '20px',
-        backgroundColor: '#f0fdf4',
+        backgroundColor: '#FFF3E0',
         borderRadius: '12px',
         display: 'flex',
         alignItems: 'center',
@@ -491,12 +491,12 @@ const styles = {
     },
     cafeSelectorLabel: {
         fontWeight: 'bold',
-        color: '#2d6a4f',
+        color: '#E8532B',
     },
     cafeSelect: {
         padding: '10px 15px',
         borderRadius: '8px',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         fontSize: '14px',
         minWidth: '250px',
         backgroundColor: 'white',
@@ -511,7 +511,7 @@ const styles = {
         borderRadius: '16px',
         padding: '20px',
         marginBottom: '25px',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
     },
     openBadge: {
@@ -534,7 +534,7 @@ const styles = {
         display: 'flex',
         gap: '10px',
         marginBottom: '25px',
-        borderBottom: '2px solid #d8f3dc',
+        borderBottom: '2px solid #FFE0C4',
         paddingBottom: '10px',
     },
     tab: {
@@ -547,7 +547,7 @@ const styles = {
         transition: 'all 0.3s',
     },
     activeTab: {
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
     },
     sectionHeader: {
@@ -560,7 +560,7 @@ const styles = {
     },
     addBtn: {
         padding: '10px 20px',
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -579,7 +579,7 @@ const styles = {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
     },
     menuInfo: {
@@ -588,14 +588,14 @@ const styles = {
     category: {
         display: 'inline-block',
         padding: '2px 8px',
-        backgroundColor: '#d8f3dc',
+        backgroundColor: '#FFE0C4',
         borderRadius: '12px',
         fontSize: '11px',
         marginRight: '8px',
     },
     price: {
         fontWeight: 'bold',
-        color: '#2d6a4f',
+        color: '#E8532B',
     },
     menuActions: {
         display: 'flex',
@@ -642,7 +642,7 @@ const styles = {
         width: '100%',
         padding: '10px',
         marginBottom: '15px',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         borderRadius: '8px',
         fontSize: '14px',
     },
@@ -650,7 +650,7 @@ const styles = {
         width: '100%',
         padding: '10px',
         marginBottom: '15px',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         borderRadius: '8px',
         resize: 'vertical',
         fontSize: '14px',
@@ -670,7 +670,7 @@ const styles = {
     },
     saveBtn: {
         padding: '8px 20px',
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '6px',
@@ -680,7 +680,7 @@ const styles = {
         textAlign: 'center',
         padding: '40px',
         color: '#666',
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#FFFDF9',
         borderRadius: '12px',
     },
     ordersSection: {
@@ -705,7 +705,7 @@ const styles = {
         marginTop: '20px',
     },
     statCard: {
-        backgroundColor: '#f0fdf4',
+        backgroundColor: '#FFF3E0',
         borderRadius: '12px',
         padding: '20px',
         textAlign: 'center',
@@ -713,7 +713,7 @@ const styles = {
     statNumber: {
         fontSize: '32px',
         fontWeight: 'bold',
-        color: '#2d6a4f',
+        color: '#E8532B',
     },
     statLabel: {
         fontSize: '14px',

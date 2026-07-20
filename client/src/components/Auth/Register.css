@@ -1,7 +1,7 @@
 /* Register Page Styles */
 .register-container {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #FF7A3D 0%, #E8532B 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -33,7 +33,7 @@
 
 .register-illustration {
     flex: 1;
-    background: linear-gradient(135deg, #5c6bc0, #3949ab);
+    background: linear-gradient(135deg, #FF7A3D, #E8532B);
     color: white;
     padding: 40px;
     display: flex;
@@ -67,7 +67,7 @@
 
 .feature-item i {
     font-size: 20px;
-    color: #a5d6a7;
+    color: #FFB84D;
 }
 
 .feature-item span {
@@ -85,7 +85,7 @@
     align-items: center;
     gap: 10px;
     margin-bottom: 20px;
-    color: #5c6bc0;
+    color: #FF7A3D;
 }
 
 .form-header i {
@@ -125,7 +125,7 @@
 }
 
 .register-form::-webkit-scrollbar-thumb {
-    background: #5c6bc0;
+    background: #FF7A3D;
     border-radius: 10px;
 }
 
@@ -173,15 +173,15 @@
 
 .input-icon input:focus,
 .input-icon select:focus {
-    border-color: #5c6bc0;
+    border-color: #FF7A3D;
     outline: none;
-    box-shadow: 0 0 0 3px rgba(92, 107, 192, 0.1);
+    box-shadow: 0 0 0 3px rgba(255, 122, 61, 0.1);
 }
 
 .submit-btn {
     width: 100%;
     padding: 14px;
-    background: linear-gradient(135deg, #5c6bc0, #3949ab);
+    background: linear-gradient(135deg, #FF7A3D, #E8532B);
     color: white;
     border: none;
     border-radius: 10px;
@@ -198,7 +198,7 @@
 
 .submit-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 7px 14px rgba(92, 107, 192, 0.3);
+    box-shadow: 0 7px 14px rgba(255, 122, 61, 0.3);
 }
 
 .submit-btn:disabled {
@@ -224,7 +224,7 @@
 }
 
 .login-link a {
-    color: #5c6bc0;
+    color: #FF7A3D;
     text-decoration: none;
     font-weight: 600;
 }
@@ -254,7 +254,7 @@
 .success-icon {
     width: 80px;
     height: 80px;
-    background: #2ecc71;
+    background: #FF7A3D;
     color: white;
     font-size: 50px;
     font-weight: bold;
@@ -274,7 +274,7 @@
 }
 
 .student-info-card h3 {
-    color: #5c6bc0;
+    color: #FF7A3D;
     margin-bottom: 15px;
 }
 

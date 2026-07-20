@@ -52,7 +52,14 @@ const Login = () => {
 
     return (
         <div style={styles.container}>
-            <div style={styles.card}>
+            <style>{`
+                @media (max-width: 480px) {
+                    .cc-login-card { padding: 24px 16px !important; }
+                    .cc-login-title { font-size: 22px !important; }
+                    .cc-login-demo-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+                }
+            `}</style>
+            <div style={styles.card} className="cc-login-card">
                 <h2 style={styles.title}>Welcome Back</h2>
                 <p style={styles.subtitle}>Login to your account</p>
                 <form onSubmit={handleSubmit}>
@@ -87,21 +94,7 @@ const Login = () => {
                 <div style={styles.demoCredentials}>
                     <p style={styles.demoTitle}>Demo Credentials:</p>
                     <div style={styles.demoGrid}>
-                        <div>
-                            <strong>Student:</strong><br />
-                            Email: student@test.com<br />
-                            Password: student123
-                        </div>
-                        <div>
-                            <strong>Admin:</strong><br />
-                            Email: admin@campuscrave.com<br />
-                            Password: Admin123
-                        </div>
-                        <div>
-                            <strong>Owner:</strong><br />
-                            Email: owner@campuscrave.com<br />
-                            Password: Owner123
-                        </div>
+                     
                     </div>
                 </div>
             </div>
@@ -116,7 +109,7 @@ const styles = {
         alignItems: 'center',
         minHeight: '80vh',
         padding: '20px',
-        backgroundColor: '#f5f7fa',
+        backgroundColor: '#FFFDF9',
     },
     card: {
         background: 'white',
@@ -129,13 +122,13 @@ const styles = {
     title: {
         textAlign: 'center',
         marginBottom: '10px',
-        color: '#2d6a4f',
+        color: '#E8532B',
         fontSize: '28px',
     },
     subtitle: {
         textAlign: 'center',
         marginBottom: '30px',
-        color: '#52b788',
+        color: '#FFB84D',
     },
     inputGroup: {
         marginBottom: '20px',
@@ -143,7 +136,7 @@ const styles = {
     input: {
         width: '100%',
         padding: '14px',
-        border: '1px solid #d8f3dc',
+        border: '1px solid #FFE0C4',
         borderRadius: '8px',
         fontSize: '14px',
         transition: 'border 0.3s',
@@ -152,7 +145,7 @@ const styles = {
     button: {
         width: '100%',
         padding: '14px',
-        backgroundColor: '#2d6a4f',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -174,17 +167,17 @@ const styles = {
         marginTop: '20px',
     },
     link: {
-        color: '#2d6a4f',
+        color: '#E8532B',
         textDecoration: 'none',
     },
     demoCredentials: {
         marginTop: '25px',
         paddingTop: '20px',
-        borderTop: '1px solid #d8f3dc',
+        borderTop: '1px solid #FFE0C4',
     },
     demoTitle: {
         fontSize: '12px',
-        color: '#666',
+        color: '#2C2A28',
         marginBottom: '10px',
         textAlign: 'center',
     },

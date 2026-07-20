@@ -1,14 +1,14 @@
 /* CSS Variables */
 :root {
-    --primary: #667eea;
-    --primary-dark: #5a67d8;
-    --secondary: #764ba2;
-    --accent: #f093fb;
+    --primary: #FF7A3D;
+    --primary-dark: #E8532B;
+    --secondary: #FFB84D;
+    --accent: #E8532B;
     --success: #48bb78;
-    --warning: #ed8936;
+    --warning: #FFB84D;
     --danger: #f56565;
-    --dark: #1a1a2e;
-    --light: #f7fafc;
+    --dark: #2C2A28;
+    --light: #FFFDF9;
     --gray: #a0aec0;
     --gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
     --gradient-accent: linear-gradient(135deg, var(--accent) 0%, var(--primary) 100%);
@@ -133,7 +133,7 @@
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: #FFF3E0;
     border-radius: 10px;
 }
 

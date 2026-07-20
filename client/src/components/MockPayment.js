@@ -174,7 +174,7 @@ const styles = {
         alignItems: 'center',
         minHeight: '80vh',
         padding: '20px',
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#FFFDF9',
     },
     card: {
         background: 'white',
@@ -187,17 +187,17 @@ const styles = {
     title: {
         textAlign: 'center',
         marginBottom: '30px',
-        color: '#2c3e50',
+        color: '#2C2A28',
     },
     warningCard: {
-        backgroundColor: '#fef3c7',
+        backgroundColor: '#FFF3E0',
         padding: '15px',
         borderRadius: '10px',
         marginBottom: '20px',
-        border: '1px solid #f59e0b',
+        border: '1px solid #FFB84D',
     },
     orderDetails: {
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#FFFDF9',
         padding: '20px',
         borderRadius: '10px',
         marginBottom: '20px',
@@ -209,26 +209,26 @@ const styles = {
         borderBottom: '1px solid #e9ecef',
     },
     amount: {
-        color: '#27ae60',
+        color: '#FF7A3D',
         fontWeight: 'bold',
         fontSize: '18px',
     },
     partialAmount: {
-        color: '#f39c12',
+        color: '#FFB84D',
         fontWeight: 'bold',
     },
     paymentInfo: {
         marginBottom: '20px',
     },
     mockCardDetails: {
-        backgroundColor: '#e8f4fd',
+        backgroundColor: '#FFF3E0',
         padding: '15px',
         borderRadius: '10px',
         marginTop: '10px',
     },
     demoNote: {
         fontSize: '12px',
-        color: '#666',
+        color: '#2C2A28',
         marginTop: '10px',
     },
     code: {
@@ -242,7 +242,7 @@ const styles = {
     payButton: {
         width: '100%',
         padding: '15px',
-        backgroundColor: '#27ae60',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -257,7 +257,7 @@ const styles = {
     },
     spinner: {
         border: '3px solid #f3f3f3',
-        borderTop: '3px solid #3498db',
+        borderTop: '3px solid #FF7A3D',
         borderRadius: '50%',
         width: '40px',
         height: '40px',
@@ -276,7 +276,7 @@ const styles = {
     checkmark: {
         width: '80px',
         height: '80px',
-        backgroundColor: '#27ae60',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         borderRadius: '50%',
         fontSize: '50px',
@@ -284,22 +284,22 @@ const styles = {
         margin: '0 auto 20px',
     },
     successTitle: {
-        color: '#27ae60',
+        color: '#FF7A3D',
         marginBottom: '20px',
     },
     details: {
         margin: '20px 0',
         padding: '15px',
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#FFFDF9',
         borderRadius: '10px',
         textAlign: 'left',
     },
     paidStatus: {
-        color: '#27ae60',
+        color: '#FF7A3D',
         fontWeight: 'bold',
     },
     partialNote: {
-        backgroundColor: '#fef3c7',
+        backgroundColor: '#FFF3E0',
         padding: '10px',
         borderRadius: '8px',
         marginTop: '10px',
@@ -308,7 +308,7 @@ const styles = {
     button: {
         marginTop: '20px',
         padding: '12px 30px',
-        backgroundColor: '#3498db',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',

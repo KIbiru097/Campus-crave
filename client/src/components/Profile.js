@@ -79,7 +79,7 @@ const styles = {
     },
     title: {
         marginBottom: '20px',
-        color: '#2c3e50',
+        color: '#2C2A28',
     },
     card: {
         backgroundColor: 'white',

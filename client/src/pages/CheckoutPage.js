@@ -294,7 +294,7 @@ const styles = {
     },
     title: {
         marginBottom: '30px',
-        color: '#2c3e50',
+        color: '#2C2A28',
     },
     checkoutGrid: {
         display: 'grid',
@@ -325,7 +325,7 @@ const styles = {
     itemQuantity: {
         fontWeight: 'bold',
         marginRight: '10px',
-        color: '#667eea',
+        color: '#FF7A3D',
     },
     itemName: {
         color: '#333',
@@ -338,7 +338,7 @@ const styles = {
         justifyContent: 'space-between',
         padding: '8px 0',
         fontSize: '14px',
-        color: '#666',
+        color: '#2C2A28',
     },
     divider: {
         height: '1px',
@@ -350,7 +350,7 @@ const styles = {
         justifyContent: 'space-between',
         fontSize: '18px',
         fontWeight: 'bold',
-        color: '#2c3e50',
+        color: '#2C2A28',
     },
     formGroup: {
         marginBottom: '20px',
@@ -425,7 +425,7 @@ const styles = {
     },
     placeOrderBtn: {
         padding: '12px 32px',
-        backgroundColor: '#27ae60',
+        backgroundColor: '#FF7A3D',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
