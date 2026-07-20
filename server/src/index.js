@@ -12,13 +12,33 @@ const PORT = process.env.PORT || 4000;
 
 // ==================== CORS CONFIGURATION ====================
 
-// Manual CORS headers - This WORKS for Vercel frontend
+// List of allowed origins
+const allowedOrigins = [
+    'https://kb-campus-web.vercel.app',
+    'https://cumcravestuorder.vercel.app',
+    'https://*.vercel.app'
+];
+
+// Manual CORS headers - Allow both Vercel frontends
 app.use((req, res, next) => {
-    // Allow your Vercel frontend
-    const allowedOrigin = 'https://kb-campus-web.vercel.app';
+    const origin = req.headers.origin;
+    
+    // Check if origin is allowed
+    let allowedOrigin = null;
+    if (origin) {
+        if (allowedOrigins.some(allowed => origin === allowed || origin.endsWith('.vercel.app'))) {
+            allowedOrigin = origin;
+        }
+    }
     
     // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    if (allowedOrigin) {
+        res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    } else {
+        // For development, allow all (optional)
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
@@ -32,12 +52,27 @@ app.use((req, res, next) => {
     next();
 });
 
-// Additional cors middleware as backup
+// Additional cors middleware as backup - Allow dynamic origins
 app.use(cors({
-    origin: 'https://kb-campus-web.vercel.app',
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // Check if origin is allowed
+        if (allowedOrigins.some(allowed => origin === allowed || origin.endsWith('.vercel.app'))) {
+            callback(null, true);
+        } else {
+            // For development, allow all
+            if (process.env.NODE_ENV !== 'production') {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 
 // Body parsing middleware
@@ -135,7 +170,8 @@ app.get('/api/payment/callback', (req, res) => {
     const { tx_ref, status, order_id } = req.query;
     console.log(`📞 Payment Callback: ${tx_ref} - ${status}`);
     
-    const frontendUrl = process.env.FRONTEND_URL || 'https://kb-campus-web.vercel.app';
+    // Allow both frontend URLs
+    const frontendUrl = process.env.FRONTEND_URL || 'https://cumcravestuorder.vercel.app';
     res.redirect(`${frontendUrl}/payment/success?tx_ref=${tx_ref}&status=${status}&order_id=${order_id}`);
 });
 
@@ -180,7 +216,7 @@ ${'='.repeat(50)}
 💚 Health:       http://localhost:${PORT}/health
 🔧 Mock Payment: http://localhost:${PORT}/api/payment/initiate
 🌐 Environment:  ${process.env.NODE_ENV || 'development'}
-🔗 CORS Origin:  https://kb-campus-web.vercel.app
+🔗 CORS Origin:  ${allowedOrigins.join(', ')}
 ${'='.repeat(50)}
         `);
     });
