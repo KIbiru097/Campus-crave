@@ -234,7 +234,10 @@ const CafeManagement = () => {
                 <label style={styles.cafeSelectorLabel}>Select Cafe:</label>
                 <select
                     value={selectedCafe || ''}
-                    onChange={(e) => setSelectedCafe(parseInt(e.target.value))}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedCafe(val ? parseInt(val) : null);
+                    }}
                     style={styles.cafeSelect}
                 >
                     <option value="">-- Choose a cafe --</option>

@@ -3,7 +3,7 @@ import { setContext } from '@apollo/client/link/context';
 
 // Update to your new backend URL
 const httpLink = createHttpLink({
-    uri: process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://campus-crave-1.onrender.com/graphql',
+    uri: process.env.REACT_APP_GRAPHQL_URL || 'https://campus-crave-1.onrender.com/graphql',
 });
 
 const authLink = setContext((_, { headers }) => {

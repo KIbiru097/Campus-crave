@@ -23,7 +23,7 @@ const MockPayment = () => {
         
         setTimeout(async () => {
             try {
-                const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://campus-crave-e5aa.onrender.com'}/api/payment/verify/${txRef}`);
+                const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://campus-crave-1.onrender.com'}/api/payment/verify/${txRef}`);
                 const result = await response.json();
                 
                 if (result.success) {

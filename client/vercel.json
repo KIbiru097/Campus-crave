@@ -3,5 +3,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "installCommand": "npm install",
-  "framework": "create-react-app"
+  "framework": "create-react-app",
+  "rewrites": [
+    { "source": "/((?!static|favicon\\.ico|manifest\\.json|robots\\.txt|logo192\\.png|logo512\\.png|asset-manifest\\.json).*)", "destination": "/index.html" }
+  ]
 }

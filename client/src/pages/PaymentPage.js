@@ -67,7 +67,7 @@ const PaymentPage = () => {
 
         try {
             const response = await fetch(
-                `${process.env.REACT_APP_API_URL || 'https://campus-crave-e5aa.onrender.com'}/api/payment/initiate`,
+                `${process.env.REACT_APP_API_URL || 'https://campus-crave-1.onrender.com'}/api/payment/initiate`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

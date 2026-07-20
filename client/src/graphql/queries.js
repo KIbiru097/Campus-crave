@@ -12,7 +12,6 @@ export const GET_CAFES = gql`
             contact_phone
             is_active
             created_at
-            deleted_at
         }
     }
 `;
@@ -43,7 +42,6 @@ export const GET_MENU_ITEMS = gql`
             category
             status
             cafe_id
-            deleted_at
         }
     }
 `;
@@ -66,6 +64,7 @@ export const GET_CART = gql`
                     name
                     price
                     category
+                    cafe_id
                 }
             }
             total
