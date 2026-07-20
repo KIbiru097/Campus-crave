@@ -11,6 +11,7 @@ const typeDefs = gql`
         role: String!
         created_at: String
         last_login: String
+        deleted_at: String   # ✅ Added
     }
 
     type Student {
@@ -28,6 +29,7 @@ const typeDefs = gql`
         id_photo_path: String
         verified_at: String
         created_at: String!
+        deleted_at: String   # ✅ Added
         user: User
     }
 
@@ -40,6 +42,7 @@ const typeDefs = gql`
         is_active: Boolean!
         created_at: String!
         updated_at: String
+        deleted_at: String   # ✅ Added
         menu_items: [MenuItem]
         owner: User
         staff: [User]
@@ -52,6 +55,7 @@ const typeDefs = gql`
         position: String!
         hired_date: String
         created_at: String
+        deleted_at: String   # ✅ Added
         user: User
         cafe: Cafe
     }
@@ -68,6 +72,7 @@ const typeDefs = gql`
         status: String!
         created_at: String!
         updated_at: String
+        deleted_at: String   # ✅ Added
         cafe: Cafe
     }
 
@@ -79,6 +84,7 @@ const typeDefs = gql`
         unit_price: Float!
         subtotal: Float!
         customizations: String
+        deleted_at: String   # ✅ Added
         menu_item: MenuItem
     }
 
@@ -98,6 +104,7 @@ const typeDefs = gql`
         completed_at: String
         created_at: String!
         updated_at: String!
+        deleted_at: String   # ✅ Added
         student: Student
         cafe: Cafe
         items: [OrderItem]
@@ -115,6 +122,7 @@ const typeDefs = gql`
         refund_amount: Float
         refund_transaction_id: String
         processed_at: String!
+        deleted_at: String   # ✅ Added
         order: Order
     }
 
@@ -130,6 +138,7 @@ const typeDefs = gql`
         notes: String
         created_at: String!
         updated_at: String!
+        deleted_at: String   # ✅ Added
         delivery_person: User
         assigner: User
         order: Order
@@ -143,6 +152,7 @@ const typeDefs = gql`
         item_count: Int
         created_at: String!
         updated_at: String!
+        deleted_at: String   # ✅ Added
     }
 
     type CartItem {
@@ -153,6 +163,7 @@ const typeDefs = gql`
         unit_price: Float!
         customizations: String
         added_at: String!
+        deleted_at: String   # ✅ Added
         menu_item: MenuItem
     }
 
@@ -166,6 +177,7 @@ const typeDefs = gql`
         status: String!
         error_message: String
         created_at: String!
+        deleted_at: String   # ✅ Added
         student: Student
     }
 

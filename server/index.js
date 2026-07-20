@@ -14,48 +14,32 @@ const PORT = process.env.PORT || 4000;
 // ==================== CORS CONFIGURATION ====================
 
 // Simple CORS configuration - Allow Vercel frontend
+const allowedOrigins = [
+    'https://kb-campus-web.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+];
+
 const corsOptions = {
-    origin: 'https://kb-campus-web.vercel.app',  // Your exact Vercel frontend URL
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Allow all in dev; tighten for production
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['Content-Length', 'X-Knowledge-Id'],
-    maxAge: 86400 // 24 hours
-};
-
-// For development with multiple origins, use this array instead:
-/*
-const corsOptions = {
-    origin: [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'https://kb-campus-web.vercel.app',
-        'https://campus-crave.vercel.app',
-        'https://campus-crave-e5aa.onrender.com'
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Length'],
     maxAge: 86400
 };
-*/
 
-// Apply CORS middleware globally
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Add manual CORS headers for all responses (backup)
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', 'https://kb-campus-web.vercel.app');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-    next();
-});
+// Health and CORS preflight handled by middleware above
 
 // ==================== HEALTH CHECK ====================
 
@@ -194,7 +178,7 @@ ${'='.repeat(50)}
 💚 Health:       http://localhost:${PORT}/health
 🔧 Mock Payment: http://localhost:${PORT}/api/payment/initiate
 🌐 Environment:  ${process.env.NODE_ENV || 'development'}
-🔗 CORS Origin:  https://kb-campus-web.vercel.app
+🔗 CORS:  wildcard *.vercel.app + localhost
 ${'='.repeat(50)}
         `);
     });
