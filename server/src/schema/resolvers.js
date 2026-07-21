@@ -1,6 +1,57 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/database');
+
+// PubSub for subscriptions
+const { PubSub } = require('graphql-subscriptions');
+const pubsub = new PubSub();
+
+// Subscription event names
+const EVENTS = {
+    ORDER_STATUS_CHANGED: 'ORDER_STATUS_CHANGED',
+    NEW_ORDER: 'NEW_ORDER',
+    NEW_DELIVERY_ASSIGNED: 'NEW_DELIVERY_ASSIGNED',
+    DELIVERY_STATUS_CHANGED: 'DELIVERY_STATUS_CHANGED',
+};
+
+// Rate limiting store (in-memory)
+const rateLimitStore = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000;
+const RATE_LIMIT_MAX = 30;
+
+function checkRateLimit(ip) {
+    const now = Date.now();
+    const entry = rateLimitStore.get(ip);
+    if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW) {
+        rateLimitStore.set(ip, { windowStart: now, count: 1 });
+        return true;
+    }
+    entry.count++;
+    if (entry.count > RATE_LIMIT_MAX) return false;
+    return true;
+}
+
+// Clean up old rate limit entries periodically
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of rateLimitStore) {
+        if (now - entry.windowStart > RATE_LIMIT_WINDOW * 2) rateLimitStore.delete(ip);
+    }
+}, 60000);
+
+// Audit logging helper
+async function logAudit(userId, action, entityType, entityId, details, ipAddress) {
+    try {
+        await pool.query(
+            `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [userId, action, entityType, entityId, details ? JSON.stringify(details) : null, ipAddress || null]
+        );
+    } catch (err) {
+        console.error('Audit log error:', err);
+    }
+}
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -8,6 +59,15 @@ const generateToken = (user) => {
         { id: user.id, email: user.email, role: user.role },
         process.env.JWT_SECRET || 'campus_crave_secret_2024',
         { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+};
+
+// Helper function to generate refresh token
+const generateRefreshToken = (user) => {
+    return jwt.sign(
+        { id: user.id, type: 'refresh' },
+        process.env.JWT_SECRET || 'campus_crave_secret_2024',
+        { expiresIn: '30d' }
     );
 };
 
@@ -459,6 +519,343 @@ const resolvers = {
                 throw new Error('Failed to fetch students');
             }
         },
+
+        // ============== REVIEW QUERIES ==============
+        
+        cafeReviews: async (_, { cafe_id }) => {
+            try {
+                const result = await pool.query(
+                    `SELECT r.*, s.full_name as student_name
+                     FROM reviews r
+                     JOIN students s ON r.student_id = s.id
+                     WHERE r.cafe_id = $1 AND r.deleted_at IS NULL
+                     ORDER BY r.created_at DESC`,
+                    [cafe_id]
+                );
+                return result.rows;
+            } catch (error) {
+                console.error('Error fetching cafe reviews:', error);
+                return [];
+            }
+        },
+        
+        menuItemReviews: async (_, { menu_item_id }) => {
+            try {
+                const result = await pool.query(
+                    `SELECT r.*, s.full_name as student_name
+                     FROM reviews r
+                     JOIN students s ON r.student_id = s.id
+                     WHERE r.menu_item_id = $1 AND r.deleted_at IS NULL
+                     ORDER BY r.created_at DESC`,
+                    [menu_item_id]
+                );
+                return result.rows;
+            } catch (error) {
+                console.error('Error fetching menu item reviews:', error);
+                return [];
+            }
+        },
+        
+        myReviews: async (_, __, { user }) => {
+            if (!user) throw new Error('Not authenticated');
+            try {
+                const studentResult = await pool.query('SELECT id FROM students WHERE user_id = $1', [user.id]);
+                if (studentResult.rows.length === 0) return [];
+                const studentId = studentResult.rows[0].id;
+                const result = await pool.query(
+                    `SELECT r.* FROM reviews r
+                     WHERE r.student_id = $1 AND r.deleted_at IS NULL
+                     ORDER BY r.created_at DESC`,
+                    [studentId]
+                );
+                return result.rows;
+            } catch (error) {
+                console.error('Error fetching my reviews:', error);
+                return [];
+            }
+        },
+        
+        // ============== LOYALTY QUERIES ==============
+        
+        myLoyaltyPoints: async (_, __, { user }) => {
+            if (!user) throw new Error('Not authenticated');
+            try {
+                const studentResult = await pool.query('SELECT id FROM students WHERE user_id = $1', [user.id]);
+                if (studentResult.rows.length === 0) return null;
+                const studentId = studentResult.rows[0].id;
+                const result = await pool.query('SELECT * FROM loyalty_points WHERE student_id = $1', [studentId]);
+                if (result.rows.length === 0) {
+                    const newPoints = await pool.query(
+                        'INSERT INTO loyalty_points (student_id) VALUES ($1) RETURNING *',
+                        [studentId]
+                    );
+                    return newPoints.rows[0];
+                }
+                return result.rows[0];
+            } catch (error) {
+                console.error('Error fetching loyalty points:', error);
+                return null;
+            }
+        },
+        
+        myLoyaltyTransactions: async (_, { limit = 20 }, { user }) => {
+            if (!user) throw new Error('Not authenticated');
+            try {
+                const studentResult = await pool.query('SELECT id FROM students WHERE user_id = $1', [user.id]);
+                if (studentResult.rows.length === 0) return [];
+                const studentId = studentResult.rows[0].id;
+                const result = await pool.query(
+                    'SELECT * FROM loyalty_transactions WHERE student_id = $1 ORDER BY created_at DESC LIMIT $2',
+                    [studentId, limit]
+                );
+                return result.rows;
+            } catch (error) {
+                console.error('Error fetching loyalty transactions:', error);
+                return [];
+            }
+        },
+        
+        myRedemptions: async (_, __, { user }) => {
+            if (!user) throw new Error('Not authenticated');
+            try {
+                const studentResult = await pool.query('SELECT id FROM students WHERE user_id = $1', [user.id]);
+                if (studentResult.rows.length === 0) return [];
+                const studentId = studentResult.rows[0].id;
+                const result = await pool.query(
+                    'SELECT * FROM reward_redemptions WHERE student_id = $1 ORDER BY created_at DESC',
+                    [studentId]
+                );
+                return result.rows;
+            } catch (error) {
+                console.error('Error fetching redemptions:', error);
+                return [];
+            }
+        },
+        
+        // ============== ANALYTICS QUERIES ==============
+        
+        analytics: async (_, { days = 30 }, { user }) => {
+            if (!user || user.role !== 'admin') throw new Error('Not authorized');
+            
+            try {
+                const revenueResult = await pool.query(
+                    `SELECT COALESCE(SUM(total_amount), 0) as total_revenue,
+                            COUNT(*) as total_orders,
+                            COALESCE(AVG(total_amount), 0) as avg_order_value
+                     FROM orders WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '1 day' * $1`,
+                    [days]
+                );
+                
+                const dailyRevenue = await pool.query(
+                    `SELECT DATE(created_at) as date,
+                            SUM(total_amount) as revenue,
+                            COUNT(*) as order_count
+                     FROM orders WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '1 day' * $1
+                     GROUP BY DATE(created_at) ORDER BY date DESC`,
+                    [days]
+                );
+                
+                const topSelling = await pool.query(
+                    `SELECT mi.name, c.name as cafe_name, SUM(oi.quantity) as total_quantity,
+                            SUM(oi.subtotal) as total_revenue
+                     FROM order_items oi
+                     JOIN menu_items mi ON oi.menu_item_id = mi.id
+                     JOIN orders o ON oi.order_id = o.id
+                     JOIN cafes c ON o.cafe_id = c.id
+                     WHERE o.deleted_at IS NULL AND o.created_at > NOW() - INTERVAL '1 day' * $1
+                     GROUP BY mi.name, c.name
+                     ORDER BY total_quantity DESC LIMIT 10`,
+                    [days]
+                );
+                
+                const cafePerf = await pool.query(
+                    `SELECT c.name as cafe_name, COUNT(*) as order_count,
+                            SUM(o.total_amount) as revenue,
+                            AVG(EXTRACT(EPOCH FROM (d.delivered_time - o.created_at))/60) as avg_delivery_time
+                     FROM orders o
+                     JOIN cafes c ON o.cafe_id = c.id
+                     LEFT JOIN deliveries d ON d.order_id = o.id
+                     WHERE o.deleted_at IS NULL AND o.created_at > NOW() - INTERVAL '1 day' * $1
+                     GROUP BY c.name ORDER BY revenue DESC`,
+                    [days]
+                );
+                
+                const orderTrend = await pool.query(
+                    `SELECT DATE(created_at) as date, COUNT(*) as count
+                     FROM orders WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '1 day' * $1
+                     GROUP BY DATE(created_at) ORDER BY date DESC`,
+                    [days]
+                );
+                
+                const avgDeliveryTime = await pool.query(
+                    `SELECT AVG(EXTRACT(EPOCH FROM (delivered_time - o.created_at))/60) as avg_minutes
+                     FROM deliveries d
+                     JOIN orders o ON d.order_id = o.id
+                     WHERE d.delivered_time IS NOT NULL
+                     AND d.created_at > NOW() - INTERVAL '1 day' * $1`,
+                    [days]
+                );
+                
+                const rv = revenueResult.rows[0];
+                return {
+                    total_revenue: parseFloat(rv.total_revenue) || 0,
+                    total_orders: parseInt(rv.total_orders) || 0,
+                    avg_order_value: parseFloat(rv.avg_order_value) || 0,
+                    avg_delivery_time: parseFloat(avgDeliveryTime.rows[0]?.avg_minutes) || null,
+                    daily_revenue: dailyRevenue.rows.map(r => ({
+                        date: r.date,
+                        revenue: parseFloat(r.revenue),
+                        order_count: parseInt(r.order_count)
+                    })),
+                    top_selling_items: topSelling.rows.map(r => ({
+                        name: r.name,
+                        cafe_name: r.cafe_name,
+                        total_quantity: parseInt(r.total_quantity),
+                        total_revenue: parseFloat(r.total_revenue)
+                    })),
+                    cafe_performance: cafePerf.rows.map(r => ({
+                        cafe_name: r.cafe_name,
+                        order_count: parseInt(r.order_count),
+                        revenue: parseFloat(r.revenue),
+                        avg_delivery_time: r.avg_delivery_time ? parseFloat(r.avg_delivery_time) : null
+                    })),
+                    order_volume_trend: orderTrend.rows.map(r => ({
+                        date: r.date,
+                        count: parseInt(r.count)
+                    }))
+                };
+            } catch (error) {
+                console.error('Analytics error:', error);
+                throw new Error('Failed to fetch analytics');
+            }
+        },
+        
+        // ============== RECOMMENDATIONS ==============
+        
+        recommendations: async (_, { cafe_id, limit = 6 }, { user }) => {
+            try {
+                let studentId = null;
+                if (user) {
+                    const studentResult = await pool.query('SELECT id FROM students WHERE user_id = $1', [user.id]);
+                    if (studentResult.rows.length > 0) studentId = studentResult.rows[0].id;
+                }
+                
+                let items;
+                if (studentId) {
+                    items = await pool.query(
+                        `SELECT mi.*, c.name as cafe_name,
+                                (SELECT COUNT(*) FROM order_items oi2
+                                 JOIN orders o2 ON oi2.order_id = o2.id
+                                 WHERE o2.student_id = $2 AND oi2.menu_item_id = mi.id) as order_count
+                         FROM menu_items mi
+                         JOIN cafes c ON mi.cafe_id = c.id
+                         WHERE mi.deleted_at IS NULL AND mi.status = 'Available'
+                         ${cafe_id ? 'AND mi.cafe_id = $3' : ''}
+                         ORDER BY order_count DESC, RANDOM()
+                         LIMIT $1`,
+                        [limit, studentId, ...(cafe_id ? [cafe_id] : [])]
+                    );
+                } else {
+                    items = await pool.query(
+                        `SELECT mi.*, c.name as cafe_name,
+                                (SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.menu_item_id = mi.id) as order_count
+                         FROM menu_items mi
+                         JOIN cafes c ON mi.cafe_id = c.id
+                         WHERE mi.deleted_at IS NULL AND mi.status = 'Available'
+                         ${cafe_id ? 'AND mi.cafe_id = $2' : ''}
+                         ORDER BY order_count DESC NULLS LAST, RANDOM()
+                         LIMIT $1`,
+                        [limit, ...(cafe_id ? [cafe_id] : [])]
+                    );
+                }
+                
+                return items.rows.map((item, idx) => ({
+                    id: item.id,
+                    name: item.name,
+                    description: item.description,
+                    price: item.price,
+                    category: item.category,
+                    cafe_id: item.cafe_id,
+                    cafe_name: item.cafe_name,
+                    score: item.order_count > 0 ? 1.0 - (idx * 0.1) : 0.5,
+                    reason: item.order_count > 0 ? 'Ordered before' : 'Popular item'
+                }));
+            } catch (error) {
+                console.error('Recommendations error:', error);
+                return [];
+            }
+        },
+        
+        // ============== DELIVERY ROUTE ==============
+        
+        optimizedDeliveryRoute: async (_, __, { user }) => {
+            if (!user || user.role !== 'delivery') throw new Error('Not authorized');
+            
+            try {
+                const deliveries = await pool.query(
+                    `SELECT d.*, o.order_number, o.delivery_address, o.total_amount,
+                            c.name as cafe_name, c.location as cafe_location,
+                            s.full_name as student_name
+                     FROM deliveries d
+                     JOIN orders o ON d.order_id = o.id
+                     JOIN cafes c ON o.cafe_id = c.id
+                     JOIN students s ON o.student_id = s.id
+                     WHERE d.delivery_person_id = $1
+                     AND d.status IN ('ASSIGNED', 'PICKED_UP')
+                     AND d.deleted_at IS NULL
+                     ORDER BY d.created_at ASC`,
+                    [user.id]
+                );
+                
+                if (deliveries.rows.length === 0) {
+                    return { pickup: null, dropoffs: [], optimized_order: [] };
+                }
+                
+                const stops = deliveries.rows.map((d, idx) => ({
+                    order_id: d.order_id,
+                    order_number: d.order_number,
+                    address: d.delivery_address || d.cafe_location,
+                    cafe_name: d.cafe_name,
+                    student_name: d.student_name,
+                    priority: d.status === 'PICKED_UP' ? 0 : 1
+                }));
+                
+                stops.sort((a, b) => a.priority - b.priority || a.order_id - b.order_id);
+                
+                const pickup = stops.find(s => s.priority === 1) || stops[0];
+                const dropoffs = stops.filter(s => s.order_id !== pickup?.order_id);
+                
+                return {
+                    pickup,
+                    dropoffs,
+                    optimized_order: stops
+                };
+            } catch (error) {
+                console.error('Delivery route error:', error);
+                return { pickup: null, dropoffs: [], optimized_order: [] };
+            }
+        },
+        
+        // ============== AUDIT LOGS ==============
+        
+        auditLogs: async (_, { limit = 50, offset = 0, action }, { user }) => {
+            if (!user || user.role !== 'admin') throw new Error('Not authorized');
+            try {
+                let query = 'SELECT * FROM audit_logs';
+                const values = [];
+                if (action) {
+                    values.push(action);
+                    query += ` WHERE action = $${values.length}`;
+                }
+                values.push(limit, offset);
+                query += ` ORDER BY created_at DESC LIMIT $${values.length - 1} OFFSET $${values.length}`;
+                const result = await pool.query(query, values);
+                return result.rows;
+            } catch (error) {
+                console.error('Error fetching audit logs:', error);
+                return [];
+            }
+        },
     },
     
     // ============== FIELD RESOLVERS ==============
@@ -474,7 +871,54 @@ const resolvers = {
             } catch (error) {
                 return [];
             }
-        }
+        },
+        average_rating: async (cafe) => {
+            try {
+                const result = await pool.query(
+                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                    [cafe.id]
+                );
+                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+            } catch (error) {
+                return null;
+            }
+        },
+        review_count: async (cafe) => {
+            try {
+                const result = await pool.query(
+                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                    [cafe.id]
+                );
+                return parseInt(result.rows[0]?.count) || 0;
+            } catch (error) {
+                return 0;
+            }
+        },
+    },
+    
+    MenuItem: {
+        average_rating: async (menuItem) => {
+            try {
+                const result = await pool.query(
+                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                    [menuItem.id]
+                );
+                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+            } catch (error) {
+                return null;
+            }
+        },
+        review_count: async (menuItem) => {
+            try {
+                const result = await pool.query(
+                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                    [menuItem.id]
+                );
+                return parseInt(result.rows[0]?.count) || 0;
+            } catch (error) {
+                return 0;
+            }
+        },
     },
     
     CartItem: {
@@ -591,6 +1035,54 @@ const resolvers = {
             }
         },
     },
+
+    AuditLog: {
+        user: async (log) => {
+            try {
+                if (!log.user_id) return null;
+                const result = await pool.query(
+                    'SELECT id, username, email, role FROM users WHERE id = $1',
+                    [log.user_id]
+                );
+                return result.rows[0] || null;
+            } catch (error) {
+                return null;
+            }
+        },
+    },
+
+    Review: {
+        student: async (review) => {
+            try {
+                const result = await pool.query(
+                    `SELECT s.*, u.username, u.email FROM students s
+                     JOIN users u ON s.user_id = u.id WHERE s.id = $1`,
+                    [review.student_id]
+                );
+                return result.rows[0] || null;
+            } catch (error) {
+                return null;
+            }
+        },
+        cafe: async (review) => {
+            if (!review.cafe_id) return null;
+            try {
+                const result = await pool.query('SELECT * FROM cafes WHERE id = $1', [review.cafe_id]);
+                return result.rows[0] || null;
+            } catch (error) {
+                return null;
+            }
+        },
+        menu_item: async (review) => {
+            if (!review.menu_item_id) return null;
+            try {
+                const result = await pool.query('SELECT * FROM menu_items WHERE id = $1', [review.menu_item_id]);
+                return result.rows[0] || null;
+            } catch (error) {
+                return null;
+            }
+        },
+    },
     
     // ============== MUTATION RESOLVERS ==============
     
@@ -632,16 +1124,27 @@ const resolvers = {
                 );
                 
                 const token = generateToken(user);
+                const refreshToken = generateRefreshToken(user);
                 
-                return { token, user };
+                await pool.query(
+                    'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'30 days\')',
+                    [user.id, refreshToken]
+                );
+                
+                return { token, refreshToken, user };
             } catch (error) {
                 console.error('Registration error:', error);
                 throw new Error(error.message || 'Registration failed');
             }
         },
         
-        login: async (_, { input }) => {
+        login: async (_, { input }, { req }) => {
             try {
+                const ip = req?.ip || req?.connection?.remoteAddress || 'unknown';
+                if (!checkRateLimit(ip)) {
+                    throw new Error('Too many login attempts. Please try again later.');
+                }
+                
                 const userResult = await pool.query(
                     'SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL',
                     [input.email]
@@ -664,10 +1167,17 @@ const resolvers = {
                 );
                 
                 const token = generateToken(user);
+                const refreshToken = generateRefreshToken(user);
+                
+                // Store refresh token
+                await pool.query(
+                    'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'30 days\')',
+                    [user.id, refreshToken]
+                );
                 
                 delete user.password_hash;
                 
-                return { token, user };
+                return { token, refreshToken, user };
             } catch (error) {
                 console.error('Login error:', error);
                 throw new Error(error.message || 'Login failed');
@@ -872,7 +1382,8 @@ const resolvers = {
             }
         },
         
-        // Order Mutations
+        // ============== ORDER MUTATIONS ==============
+        
         createOrder: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             
@@ -915,7 +1426,15 @@ const resolvers = {
                     paymentType = 'Online';
                 }
                 
-                const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+                // 🔧 FIXED: Generate shorter order number
+                // Get today's order count
+                const countResult = await pool.query(
+                    "SELECT COUNT(*) as count FROM orders WHERE DATE(created_at) = CURRENT_DATE"
+                );
+                const todayCount = parseInt(countResult.rows[0].count) + 1;
+                const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+                const orderNumber = `ORD-${dateStr}-${String(todayCount).padStart(3, '0')}`;
+                // Example: ORD-20260721-001 (17 characters - well under 20!)
                 
                 const orderResult = await pool.query(
                     `INSERT INTO orders (student_id, cafe_id, total_amount, item_count, payment_type, special_instructions, order_status, order_number) 
@@ -942,6 +1461,31 @@ const resolvers = {
                 
                 await pool.query('DELETE FROM cart_items WHERE cart_id = $1', [cart.id]);
                 
+                // Publish new order event
+                pubsub.publish(EVENTS.NEW_ORDER, { newOrder: order });
+                
+                // Award loyalty points (1 point per ETB 10 spent)
+                const pointsEarned = Math.floor(totalAmount / 10);
+                if (pointsEarned > 0) {
+                    try {
+                        await pool.query(
+                            `INSERT INTO loyalty_points (student_id, points, total_earned)
+                             VALUES ($1, $2, $2)
+                             ON CONFLICT (student_id) DO UPDATE SET
+                             points = loyalty_points.points + $2,
+                             total_earned = loyalty_points.total_earned + $2`,
+                            [studentId, pointsEarned]
+                        );
+                        await pool.query(
+                            `INSERT INTO loyalty_transactions (student_id, points, type, description, order_id)
+                             VALUES ($1, $2, 'EARNED', $3, $4)`,
+                            [studentId, pointsEarned, `Earned ${pointsEarned} points for order #${orderNumber}`, order.id]
+                        );
+                    } catch (e) {
+                        console.error('Loyalty points error:', e);
+                    }
+                }
+                
                 return order;
             } catch (error) {
                 console.error('Create order error:', error);
@@ -965,7 +1509,11 @@ const resolvers = {
                 );
                 
                 if (result.rows.length === 0) throw new Error('Order not found');
-                return result.rows[0];
+                
+                const order = result.rows[0];
+                pubsub.publish(EVENTS.ORDER_STATUS_CHANGED, { orderStatusChanged: order });
+                
+                return order;
             } catch (error) {
                 console.error('Update order status error:', error);
                 throw new Error('Failed to update order status');
@@ -1189,7 +1737,7 @@ const resolvers = {
             }
         },
         
-        // ============== MENU ITEM MUTATIONS (FIXED) ==============
+        // ============== MENU ITEM MUTATIONS ==============
         
         createMenuItem: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
@@ -1418,7 +1966,10 @@ const resolvers = {
                     [order_id]
                 );
                 
-                return result.rows[0];
+                const delivery = result.rows[0];
+                pubsub.publish(EVENTS.NEW_DELIVERY_ASSIGNED, { newDeliveryAssigned: delivery });
+                
+                return delivery;
             } catch (error) {
                 console.error('Assign delivery error:', error);
                 throw new Error('Failed to assign delivery');
@@ -1458,7 +2009,10 @@ const resolvers = {
                     );
                 }
                 
-                return result.rows[0];
+                const updatedDelivery = result.rows[0];
+                pubsub.publish(EVENTS.DELIVERY_STATUS_CHANGED, { deliveryStatusChanged: updatedDelivery });
+                
+                return updatedDelivery;
             } catch (error) {
                 console.error('Update delivery status error:', error);
                 throw new Error('Failed to update delivery status');
