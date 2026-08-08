@@ -21,7 +21,8 @@ const PARTICLES = Array.from({ length: 20 }, (_, i) => ({
   opacity: 0.12 + Math.random() * 0.2,
 }));
 
-function AmbientParticles() {
+// ⚡ Bolt: Memoize AmbientParticles to prevent useless re-renders of all 20 elements on parent state changes (e.g. cart updates, search filter, item detail overlays)
+const AmbientParticles = React.memo(function AmbientParticles() {
   return (
     <div className="qr-particles">
       {PARTICLES.map(p => (
@@ -40,7 +41,7 @@ function AmbientParticles() {
       ))}
     </div>
   );
-}
+});
 
 export default function QRMenuPage() {
   const { tableId } = useParams();

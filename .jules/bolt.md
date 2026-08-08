@@ -1,0 +1,3 @@
+## 2026-08-08 - [React.memo on Animation/Visual Heavy Components]
+**Learning:** Purely presentation components (like `AmbientParticles` rendering 20 custom randomized DOM nodes) that do not depend on parent state should be strictly memoized using `React.memo()`. In rendering-heavy screens like the QR Menu (`QRMenuPage`), any change to states (e.g. cart items count, search query, category, detail overlay) forces a complete re-evaluation and re-render of the parent, which triggers full DOM node re-evaluations for these complex presentation components, consuming valuable CPU cycles on mobile devices.
+**Action:** Always wrap visual background/particle/heavy presentation components in `React.memo` to shield them from parent state changes.
