@@ -164,7 +164,9 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // Create a per-request cache Map to avoid N+1 queries during resolver execution
+                const cache = new Map();
+                return { user, cache };
             },
         })
     );
