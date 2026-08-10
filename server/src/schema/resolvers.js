@@ -872,24 +872,44 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        // ⚡ Bolt Optimization: Cache rating & review count per request to prevent N+1 duplicate database queries
+        average_rating: async (cafe, _, { cache }) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const cacheKey = `cafe_reviews_stats_${cafe.id}`;
+                let stats = cache?.get(cacheKey);
+                if (!stats) {
+                    const result = await pool.query(
+                        'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                        [cafe.id]
+                    );
+                    stats = {
+                        avg_rating: result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null,
+                        count: parseInt(result.rows[0]?.count) || 0
+                    };
+                    if (cache) cache.set(cacheKey, stats);
+                }
+                return stats.avg_rating;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        // ⚡ Bolt Optimization: Cache rating & review count per request to prevent N+1 duplicate database queries
+        review_count: async (cafe, _, { cache }) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const cacheKey = `cafe_reviews_stats_${cafe.id}`;
+                let stats = cache?.get(cacheKey);
+                if (!stats) {
+                    const result = await pool.query(
+                        'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                        [cafe.id]
+                    );
+                    stats = {
+                        avg_rating: result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null,
+                        count: parseInt(result.rows[0]?.count) || 0
+                    };
+                    if (cache) cache.set(cacheKey, stats);
+                }
+                return stats.count;
             } catch (error) {
                 return 0;
             }
@@ -897,24 +917,44 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        // ⚡ Bolt Optimization: Cache rating & review count per request to prevent N+1 duplicate database queries
+        average_rating: async (menuItem, _, { cache }) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const cacheKey = `menu_item_reviews_stats_${menuItem.id}`;
+                let stats = cache?.get(cacheKey);
+                if (!stats) {
+                    const result = await pool.query(
+                        'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                        [menuItem.id]
+                    );
+                    stats = {
+                        avg_rating: result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null,
+                        count: parseInt(result.rows[0]?.count) || 0
+                    };
+                    if (cache) cache.set(cacheKey, stats);
+                }
+                return stats.avg_rating;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        // ⚡ Bolt Optimization: Cache rating & review count per request to prevent N+1 duplicate database queries
+        review_count: async (menuItem, _, { cache }) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const cacheKey = `menu_item_reviews_stats_${menuItem.id}`;
+                let stats = cache?.get(cacheKey);
+                if (!stats) {
+                    const result = await pool.query(
+                        'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                        [menuItem.id]
+                    );
+                    stats = {
+                        avg_rating: result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null,
+                        count: parseInt(result.rows[0]?.count) || 0
+                    };
+                    if (cache) cache.set(cacheKey, stats);
+                }
+                return stats.count;
             } catch (error) {
                 return 0;
             }
