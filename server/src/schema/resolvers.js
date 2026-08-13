@@ -872,24 +872,42 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        average_rating: async (cafe, _, { cache }) => {
             try {
+                const cacheKey = `cafe_reviews_stats:${cafe.id}`;
+                if (cache && cache.has(cacheKey)) {
+                    return cache.get(cacheKey).average_rating;
+                }
                 const result = await pool.query(
                     'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
                     [cafe.id]
                 );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const stats = {
+                    average_rating: result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null,
+                    review_count: parseInt(result.rows[0]?.count) || 0
+                };
+                if (cache) cache.set(cacheKey, stats);
+                return stats.average_rating;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        review_count: async (cafe, _, { cache }) => {
             try {
+                const cacheKey = `cafe_reviews_stats:${cafe.id}`;
+                if (cache && cache.has(cacheKey)) {
+                    return cache.get(cacheKey).review_count;
+                }
                 const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
                     [cafe.id]
                 );
-                return parseInt(result.rows[0]?.count) || 0;
+                const stats = {
+                    average_rating: result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null,
+                    review_count: parseInt(result.rows[0]?.count) || 0
+                };
+                if (cache) cache.set(cacheKey, stats);
+                return stats.review_count;
             } catch (error) {
                 return 0;
             }
@@ -897,24 +915,42 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        average_rating: async (menuItem, _, { cache }) => {
             try {
+                const cacheKey = `menu_item_reviews_stats:${menuItem.id}`;
+                if (cache && cache.has(cacheKey)) {
+                    return cache.get(cacheKey).average_rating;
+                }
                 const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
                     [menuItem.id]
                 );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const stats = {
+                    average_rating: result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null,
+                    review_count: parseInt(result.rows[0]?.count) || 0
+                };
+                if (cache) cache.set(cacheKey, stats);
+                return stats.average_rating;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        review_count: async (menuItem, _, { cache }) => {
             try {
+                const cacheKey = `menu_item_reviews_stats:${menuItem.id}`;
+                if (cache && cache.has(cacheKey)) {
+                    return cache.get(cacheKey).review_count;
+                }
                 const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
                     [menuItem.id]
                 );
-                return parseInt(result.rows[0]?.count) || 0;
+                const stats = {
+                    average_rating: result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null,
+                    review_count: parseInt(result.rows[0]?.count) || 0
+                };
+                if (cache) cache.set(cacheKey, stats);
+                return stats.review_count;
             } catch (error) {
                 return 0;
             }
@@ -943,16 +979,28 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        cafe: async (order, _, { cache }) => {
             try {
+                if (!order.cafe_id) return null;
+                const cacheKey = `cafe:${order.cafe_id}`;
+                if (cache && cache.has(cacheKey)) {
+                    return cache.get(cacheKey);
+                }
                 const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
+                const cafe = result.rows[0] || null;
+                if (cache) cache.set(cacheKey, cafe);
+                return cafe;
             } catch (error) {
                 return null;
             }
         },
-        student: async (order) => {
+        student: async (order, _, { cache }) => {
             try {
+                if (!order.student_id) return null;
+                const cacheKey = `student:${order.student_id}`;
+                if (cache && cache.has(cacheKey)) {
+                    return cache.get(cacheKey);
+                }
                 const result = await pool.query(
                     `SELECT s.*, u.username, u.email
                      FROM students s
@@ -960,7 +1008,9 @@ const resolvers = {
                      WHERE s.id = $1 AND u.deleted_at IS NULL`,
                     [order.student_id]
                 );
-                return result.rows[0] || null;
+                const student = result.rows[0] || null;
+                if (cache) cache.set(cacheKey, student);
+                return student;
             } catch (error) {
                 return null;
             }
