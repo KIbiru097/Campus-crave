@@ -872,24 +872,45 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        // ⚡ Bolt Optimization: Request-scoped caching for average_rating and review_count.
+        // Fetching average_rating and review_count in a single query populates both values in cache,
+        // eliminating N+1 queries when both fields are requested in a single GraphQL operation.
+        average_rating: async (cafe, _, { cache }) => {
+            const cacheKey = `cafe_rating_${cafe.id}`;
+            if (cache && cache.has(cacheKey)) return cache.get(cacheKey);
+
             try {
                 const result = await pool.query(
                     'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
                     [cafe.id]
                 );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const val = result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const count = parseInt(result.rows[0]?.count) || 0;
+                if (cache) {
+                    cache.set(cacheKey, val);
+                    cache.set(`cafe_count_${cafe.id}`, count);
+                }
+                return val;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        review_count: async (cafe, _, { cache }) => {
+            const cacheKey = `cafe_count_${cafe.id}`;
+            if (cache && cache.has(cacheKey)) return cache.get(cacheKey);
+
             try {
                 const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
                     [cafe.id]
                 );
-                return parseInt(result.rows[0]?.count) || 0;
+                const val = result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const count = parseInt(result.rows[0]?.count) || 0;
+                if (cache) {
+                    cache.set(`cafe_rating_${cafe.id}`, val);
+                    cache.set(cacheKey, count);
+                }
+                return count;
             } catch (error) {
                 return 0;
             }
@@ -897,24 +918,44 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        // ⚡ Bolt Optimization: Request-scoped caching for MenuItem average_rating and review_count.
+        // Single DB query fetches both aggregate metrics and caches them per GraphQL request.
+        average_rating: async (menuItem, _, { cache }) => {
+            const cacheKey = `menuitem_rating_${menuItem.id}`;
+            if (cache && cache.has(cacheKey)) return cache.get(cacheKey);
+
             try {
                 const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
                     [menuItem.id]
                 );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const val = result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const count = parseInt(result.rows[0]?.count) || 0;
+                if (cache) {
+                    cache.set(cacheKey, val);
+                    cache.set(`menuitem_count_${menuItem.id}`, count);
+                }
+                return val;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        review_count: async (menuItem, _, { cache }) => {
+            const cacheKey = `menuitem_count_${menuItem.id}`;
+            if (cache && cache.has(cacheKey)) return cache.get(cacheKey);
+
             try {
                 const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
                     [menuItem.id]
                 );
-                return parseInt(result.rows[0]?.count) || 0;
+                const val = result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const count = parseInt(result.rows[0]?.count) || 0;
+                if (cache) {
+                    cache.set(`menuitem_rating_${menuItem.id}`, val);
+                    cache.set(cacheKey, count);
+                }
+                return count;
             } catch (error) {
                 return 0;
             }
