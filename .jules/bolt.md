@@ -1,0 +1,3 @@
+## 2025-05-18 - GraphQL Field Resolver N+1 Query Deduplication via Context Cache
+**Learning:** In Apollo GraphQL servers backed by relational databases (pg/PostgreSQL), nested field resolvers (e.g. `Order.cafe`, `Order.student`, `Order.delivery`, `Cafe.average_rating`) trigger separate DB queries per item in list responses, causing high DB load and roundtrip latency. Instantiating a per-request `cache = new Map()` in Apollo context and storing pending query promises before awaiting deduplicates concurrent field resolver queries within a single GraphQL request lifecycle without needing heavy external dependencies.
+**Action:** Always provide a request-scoped `cache` Map in Apollo Server context and wrap database calls in field resolvers using promise-caching key lookups.
