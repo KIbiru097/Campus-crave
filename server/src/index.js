@@ -202,7 +202,8 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // Instantiate a short-lived request-scoped cache Map to deduplicate concurrent DB queries
+                return { user, cache: new Map() };
             },
         })
     );
