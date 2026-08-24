@@ -202,7 +202,21 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // ⚡ Bolt Optimization: Instantiate a short-lived request-scoped cache Map
+                // to deduplicate identical concurrent database queries across field resolvers in a single GraphQL request.
+                const queryCache = new Map();
+                const cachedQuery = async (key, queryFn) => {
+                    if (queryCache.has(key)) {
+                        return queryCache.get(key);
+                    }
+                    const promise = queryFn().catch(err => {
+                        queryCache.delete(key);
+                        throw err;
+                    });
+                    queryCache.set(key, promise);
+                    return promise;
+                };
+                return { user, queryCache, cachedQuery };
             },
         })
     );
