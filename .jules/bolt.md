@@ -1,0 +1,3 @@
+## 2026-08-26 - Avoid Inline Component Declarations inside Parent React Components
+**Learning:** Defining sub-components (`const AuroraBg = () => ...`) inside a parent component's body creates a new component function reference on every parent render. This causes React to completely unmount and remount the sub-component's DOM tree (and restart CSS animations) on every state change (e.g. typing in search inputs or updating stepper counts).
+**Action:** Always declare static sub-components outside parent component bodies at the top-level scope or memoize them to preserve component identity across renders.

@@ -24,6 +24,13 @@ const emojiFor = (category, index) => {
   return CATEGORY_EMOJI[key] || FALLBACK_EMOJI[index % FALLBACK_EMOJI.length];
 };
 
+// Declared outside MenuItems to prevent re-creation of component identity and DOM nodes on re-renders
+const AuroraBg = () => (
+  <div className="cc-menu-aurora">
+    <div className="orb o1" /><div className="orb o2" /><div className="orb o3" />
+  </div>
+);
+
 const MenuItems = ({ cafeId }) => {
   const [quantities, setQuantities] = useState({});
   const [toast, setToast] = useState(null);
@@ -123,12 +130,6 @@ const MenuItems = ({ cafeId }) => {
     }
     setTimeout(() => setToast(null), 2600);
   };
-
-  const AuroraBg = () => (
-    <div className="cc-menu-aurora">
-      <div className="orb o1" /><div className="orb o2" /><div className="orb o3" />
-    </div>
-  );
 
   if (loading) {
     return (
