@@ -24,6 +24,56 @@ const emojiFor = (category, index) => {
   return CATEGORY_EMOJI[key] || FALLBACK_EMOJI[index % FALLBACK_EMOJI.length];
 };
 
+// ⚡ Bolt Optimization: Memoized MenuItemCard component using React.memo.
+// Prevents re-rendering all menu item cards in a long list when:
+// 1. The user adjusts quantity (+/-) on a single item.
+// 2. The toast notification state updates.
+// Expected Impact: Reduces item card re-renders from N cards to 1 card per user interaction (~90%+ decrease in re-renders).
+const MenuItemCard = React.memo(({ item, index, qty, onBump, onAddToCart }) => {
+  const size = SIZE_PATTERN[index % SIZE_PATTERN.length];
+
+  return (
+    <motion.div
+      className={`cc-card ${size}`}
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ delay: (index % 6) * 0.05, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+    >
+      <div className="cc-card-top">
+        {item.category && <span className="cc-card-cat">{item.category}</span>}
+        {item.status && item.status.toLowerCase() === 'available' && (
+          <span className="cc-card-status">Available</span>
+        )}
+        <div className="cc-card-emoji">{emojiFor(item.category, index)}</div>
+      </div>
+
+      <div className="cc-card-body">
+        <h3 className="cc-card-name">{item.name}</h3>
+        {item.description && <p className="cc-card-desc">{item.description}</p>}
+
+        <div className="cc-card-foot">
+          <span className="cc-card-price">ETB {Number(item.price).toFixed(2)}</span>
+          <div className="cc-stepper">
+            <button onClick={() => onBump(item.id, -1)} aria-label="decrease">−</button>
+            <span className="n">{qty}</span>
+            <button onClick={() => onBump(item.id, 1)} aria-label="increase">+</button>
+          </div>
+        </div>
+
+        <motion.button
+          className="cc-add-btn"
+          style={{ marginTop: 6, width: '100%' }}
+          whileTap={{ scale: 0.95 }}
+          onClick={(e) => onAddToCart(e, item, qty)}
+        >
+          Add to Cart
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+});
+
 const MenuItems = ({ cafeId }) => {
   const [quantities, setQuantities] = useState({});
   const [toast, setToast] = useState(null);
@@ -62,10 +112,11 @@ const MenuItems = ({ cafeId }) => {
     return list;
   }, [items, activeCat, search]);
 
-  const getQty = id => quantities[id] || 1;
-  const bump = (id, delta) => {
+  const getQty = useCallback(id => quantities[id] || 1, [quantities]);
+
+  const bump = useCallback((id, delta) => {
     setQuantities(q => ({ ...q, [id]: Math.max(1, Math.min(10, (q[id] || 1) + delta)) }));
-  };
+  }, []);
 
   const flyToCart = useCallback((cardEl) => {
     if (!cardEl) return;
@@ -84,7 +135,7 @@ const MenuItems = ({ cafeId }) => {
     setTimeout(() => dot.remove(), 700);
   }, []);
 
-  const handleRipple = (e, cardEl) => {
+  const handleRipple = useCallback((e, cardEl) => {
     if (!cardEl) return;
     const rect = cardEl.getBoundingClientRect();
     const ripple = document.createElement('span');
@@ -95,14 +146,13 @@ const MenuItems = ({ cafeId }) => {
     ripple.style.top = `${e.clientY - rect.top - size / 2}px`;
     e.currentTarget.appendChild(ripple);
     setTimeout(() => ripple.remove(), 600);
-  };
+  }, []);
 
-  const handleAddToCart = async (e, item) => {
+  const handleAddToCart = useCallback(async (e, item, quantity) => {
     if (!user) {
       navigate('/login');
       return;
     }
-    const quantity = getQty(item.id);
     const card = e.currentTarget.closest('.cc-card');
     handleRipple(e, e.currentTarget);
     flyToCart(card);
@@ -122,7 +172,7 @@ const MenuItems = ({ cafeId }) => {
       setToast({ type: 'err', text: err.message });
     }
     setTimeout(() => setToast(null), 2600);
-  };
+  }, [user, navigate, handleRipple, flyToCart, addToCart]);
 
   const AuroraBg = () => (
     <div className="cc-menu-aurora">
@@ -220,50 +270,16 @@ const MenuItems = ({ cafeId }) => {
             </div>
           ) : (
             <div className="cc-menu-grid" ref={gridRef}>
-              {filtered.map((item, i) => {
-                const size = SIZE_PATTERN[i % SIZE_PATTERN.length];
-                return (
-                  <motion.div
-                    key={item.id}
-                    className={`cc-card ${size}`}
-                    initial={{ opacity: 0, y: 24 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: '-40px' }}
-                    transition={{ delay: (i % 6) * 0.05, duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-                  >
-                    <div className="cc-card-top">
-                      {item.category && <span className="cc-card-cat">{item.category}</span>}
-                      {item.status && item.status.toLowerCase() === 'available' && (
-                        <span className="cc-card-status">Available</span>
-                      )}
-                      <div className="cc-card-emoji">{emojiFor(item.category, i)}</div>
-                    </div>
-
-                    <div className="cc-card-body">
-                      <h3 className="cc-card-name">{item.name}</h3>
-                      {item.description && <p className="cc-card-desc">{item.description}</p>}
-
-                      <div className="cc-card-foot">
-                        <span className="cc-card-price">ETB {Number(item.price).toFixed(2)}</span>
-                        <div className="cc-stepper">
-                          <button onClick={() => bump(item.id, -1)} aria-label="decrease">−</button>
-                          <span className="n">{getQty(item.id)}</span>
-                          <button onClick={() => bump(item.id, 1)} aria-label="increase">+</button>
-                        </div>
-                      </div>
-
-                      <motion.button
-                        className="cc-add-btn"
-                        style={{ marginTop: 6, width: '100%' }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={(e) => handleAddToCart(e, item)}
-                      >
-                        Add to Cart
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                );
-              })}
+              {filtered.map((item, i) => (
+                <MenuItemCard
+                  key={item.id}
+                  item={item}
+                  index={i}
+                  qty={getQty(item.id)}
+                  onBump={bump}
+                  onAddToCart={handleAddToCart}
+                />
+              ))}
             </div>
           )}
         </motion.div>
