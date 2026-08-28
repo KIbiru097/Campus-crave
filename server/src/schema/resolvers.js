@@ -943,24 +943,41 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        // Bolt performance optimization: use request-scoped cache (context.dataLoaderCache)
+        // to deduplicate database queries for cafes across orders in a single GraphQL request.
+        cafe: async (order, _, context) => {
             try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
+                const cacheKey = `cafe:${order.cafe_id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id])
+                    .then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
         },
-        student: async (order) => {
+        student: async (order, _, context) => {
             try {
-                const result = await pool.query(
+                const cacheKey = `student:${order.student_id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query(
                     `SELECT s.*, u.username, u.email
                      FROM students s
                      JOIN users u ON s.user_id = u.id
                      WHERE s.id = $1 AND u.deleted_at IS NULL`,
                     [order.student_id]
-                );
-                return result.rows[0] || null;
+                ).then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
@@ -979,18 +996,34 @@ const resolvers = {
                 return [];
             }
         },
-        payment: async (order) => {
+        payment: async (order, _, context) => {
             try {
-                const result = await pool.query('SELECT * FROM payments WHERE order_id = $1', [order.id]);
-                return result.rows[0];
+                const cacheKey = `payment:${order.id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query('SELECT * FROM payments WHERE order_id = $1', [order.id])
+                    .then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
         },
-        delivery: async (order) => {
+        delivery: async (order, _, context) => {
             try {
-                const result = await pool.query('SELECT * FROM deliveries WHERE order_id = $1', [order.id]);
-                return result.rows[0];
+                const cacheKey = `delivery:${order.id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query('SELECT * FROM deliveries WHERE order_id = $1', [order.id])
+                    .then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
@@ -998,38 +1031,59 @@ const resolvers = {
     },
 
     Delivery: {
-        order: async (delivery) => {
+        order: async (delivery, _, context) => {
             try {
-                const result = await pool.query(
+                const cacheKey = `order:${delivery.order_id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query(
                     `SELECT o.*, c.name as cafe_name, c.location as cafe_location
                      FROM orders o
                      JOIN cafes c ON o.cafe_id = c.id
                      WHERE o.id = $1 AND o.deleted_at IS NULL`,
                     [delivery.order_id]
-                );
-                return result.rows[0] || null;
+                ).then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
         },
-        delivery_person: async (delivery) => {
+        delivery_person: async (delivery, _, context) => {
             try {
-                const result = await pool.query(
+                const cacheKey = `user:${delivery.delivery_person_id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query(
                     'SELECT id, username, email, phone, role FROM users WHERE id = $1',
                     [delivery.delivery_person_id]
-                );
-                return result.rows[0] || null;
+                ).then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
         },
-        assigner: async (delivery) => {
+        assigner: async (delivery, _, context) => {
             try {
-                const result = await pool.query(
+                const cacheKey = `user:${delivery.assigned_by}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query(
                     'SELECT id, username, email, phone, role FROM users WHERE id = $1',
                     [delivery.assigned_by]
-                );
-                return result.rows[0] || null;
+                ).then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
@@ -1037,14 +1091,21 @@ const resolvers = {
     },
 
     AuditLog: {
-        user: async (log) => {
+        user: async (log, _, context) => {
             try {
                 if (!log.user_id) return null;
-                const result = await pool.query(
-                    'SELECT id, username, email, role FROM users WHERE id = $1',
+                const cacheKey = `user:${log.user_id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query(
+                    'SELECT id, username, email, phone, role FROM users WHERE id = $1',
                     [log.user_id]
-                );
-                return result.rows[0] || null;
+                ).then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
@@ -1052,32 +1113,55 @@ const resolvers = {
     },
 
     Review: {
-        student: async (review) => {
+        student: async (review, _, context) => {
             try {
-                const result = await pool.query(
+                const cacheKey = `student:${review.student_id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query(
                     `SELECT s.*, u.username, u.email FROM students s
                      JOIN users u ON s.user_id = u.id WHERE s.id = $1`,
                     [review.student_id]
-                );
-                return result.rows[0] || null;
+                ).then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
         },
-        cafe: async (review) => {
+        cafe: async (review, _, context) => {
             if (!review.cafe_id) return null;
             try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1', [review.cafe_id]);
-                return result.rows[0] || null;
+                const cacheKey = `cafe:${review.cafe_id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query('SELECT * FROM cafes WHERE id = $1', [review.cafe_id])
+                    .then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
         },
-        menu_item: async (review) => {
+        menu_item: async (review, _, context) => {
             if (!review.menu_item_id) return null;
             try {
-                const result = await pool.query('SELECT * FROM menu_items WHERE id = $1', [review.menu_item_id]);
-                return result.rows[0] || null;
+                const cacheKey = `menu_item:${review.menu_item_id}`;
+                if (context?.dataLoaderCache?.has(cacheKey)) {
+                    return await context.dataLoaderCache.get(cacheKey);
+                }
+                const promise = pool.query('SELECT * FROM menu_items WHERE id = $1', [review.menu_item_id])
+                    .then(res => res.rows[0] || null);
+                if (context?.dataLoaderCache) {
+                    context.dataLoaderCache.set(cacheKey, promise);
+                }
+                return await promise;
             } catch (error) {
                 return null;
             }
