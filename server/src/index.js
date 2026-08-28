@@ -202,7 +202,7 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                return { user, dataLoaderCache: new Map() };
             },
         })
     );
