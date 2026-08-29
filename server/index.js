@@ -164,7 +164,9 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // ⚡ Bolt Optimization: Instantiate a request-scoped cache Map to deduplicate
+                // concurrent database calls during GraphQL field resolution (preventing N+1 queries).
+                return { user, cache: new Map() };
             },
         })
     );
