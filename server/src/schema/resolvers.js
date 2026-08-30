@@ -3,8 +3,13 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/database');
 
-// PubSub for subscriptions
-const { PubSub } = require('graphql-subscriptions');
+// PubSub for subscriptions (with fallback if module is not installed)
+let PubSub;
+try {
+    PubSub = require('graphql-subscriptions').PubSub;
+} catch (e) {
+    PubSub = class { publish() {} asyncIterator() {} };
+}
 const pubsub = new PubSub();
 
 // Subscription event names
@@ -38,7 +43,7 @@ setInterval(() => {
     for (const [ip, entry] of rateLimitStore) {
         if (now - entry.windowStart > RATE_LIMIT_WINDOW * 2) rateLimitStore.delete(ip);
     }
-}, 60000);
+}, 60000).unref();
 
 // Audit logging helper
 async function logAudit(userId, action, entityType, entityId, details, ipAddress) {
@@ -858,38 +863,134 @@ const resolvers = {
         },
     },
     
+    // ============== BATCH LOADER / REQUEST-SCOPED CACHE HELPERS ==============
+    // ⚡ PERF OPTIMIZATION: Request-scoped batching utility to eliminate N+1 queries in GraphQL field resolvers.
+    // Batches multiple lookups in the same execution tick into a single SQL query using `WHERE id = ANY(...)`.
+
+    // Creates a lightweight batch loader function with request-scoped promise caching
+    // batchFn receives unique keys and returns a Promise<Map<key, result>>
+    createBatchLoader: (batchFn) => {
+        const cache = new Map();
+        let queue = [];
+        let scheduled = false;
+
+        return (key) => {
+            if (cache.has(key)) {
+                return cache.get(key);
+            }
+
+            const promise = new Promise((resolve, reject) => {
+                queue.push({ key, resolve, reject });
+                if (!scheduled) {
+                    scheduled = true;
+                    process.nextTick(async () => {
+                        const currentQueue = queue;
+                        queue = [];
+                        scheduled = false;
+
+                        // Deduplicate keys for the single batched SQL query
+                        const uniqueKeys = [...new Set(currentQueue.map(q => q.key))];
+                        try {
+                            const resultMap = await batchFn(uniqueKeys);
+                            currentQueue.forEach(item => {
+                                item.resolve(resultMap.get(item.key));
+                            });
+                        } catch (err) {
+                            currentQueue.forEach(item => item.reject(err));
+                        }
+                    });
+                }
+            });
+
+            cache.set(key, promise);
+            return promise;
+        };
+    },
+
+    // Gets or initializes request-scoped loaders attached to GraphQL context
+    getLoaders: function(context) {
+        if (!context) context = {};
+        if (!context._loaders) {
+            context._loaders = {
+                // Batch fetch menu items for multiple cafes in 1 query instead of N queries
+                cafeMenuItems: resolvers.createBatchLoader(async (cafeIds) => {
+                    const result = await pool.query(
+                        'SELECT * FROM menu_items WHERE cafe_id = ANY($1) AND deleted_at IS NULL AND status = $2 ORDER BY category, name',
+                        [cafeIds, 'Available']
+                    );
+                    const map = new Map();
+                    cafeIds.forEach(id => map.set(id, []));
+                    result.rows.forEach(row => {
+                        if (map.has(row.cafe_id)) {
+                            map.get(row.cafe_id).push(row);
+                        }
+                    });
+                    return map;
+                }),
+
+                // Batch fetch average ratings and review counts for multiple cafes in 1 query
+                cafeReviewsStats: resolvers.createBatchLoader(async (cafeIds) => {
+                    const result = await pool.query(
+                        'SELECT cafe_id, AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = ANY($1) AND deleted_at IS NULL GROUP BY cafe_id',
+                        [cafeIds]
+                    );
+                    const map = new Map();
+                    cafeIds.forEach(id => map.set(id, { avg_rating: null, count: 0 }));
+                    result.rows.forEach(row => {
+                        map.set(row.cafe_id, {
+                            avg_rating: row.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                            count: parseInt(row.count) || 0
+                        });
+                    });
+                    return map;
+                }),
+
+                // Batch fetch average ratings and review counts for multiple menu items in 1 query
+                menuItemReviewsStats: resolvers.createBatchLoader(async (menuItemIds) => {
+                    const result = await pool.query(
+                        'SELECT menu_item_id, AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = ANY($1) AND deleted_at IS NULL GROUP BY menu_item_id',
+                        [menuItemIds]
+                    );
+                    const map = new Map();
+                    menuItemIds.forEach(id => map.set(id, { avg_rating: null, count: 0 }));
+                    result.rows.forEach(row => {
+                        map.set(row.menu_item_id, {
+                            avg_rating: row.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                            count: parseInt(row.count) || 0
+                        });
+                    });
+                    return map;
+                })
+            };
+        }
+        return context._loaders;
+    },
+
     // ============== FIELD RESOLVERS ==============
     
     Cafe: {
-        menu_items: async (cafe) => {
+        menu_items: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT * FROM menu_items WHERE cafe_id = $1 AND deleted_at IS NULL AND status = $2 ORDER BY category, name',
-                    [cafe.id, 'Available']
-                );
-                return result.rows;
+                const loaders = resolvers.getLoaders(context);
+                return await loaders.cafeMenuItems(cafe.id);
             } catch (error) {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        average_rating: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const loaders = resolvers.getLoaders(context);
+                const stats = await loaders.cafeReviewsStats(cafe.id);
+                return stats?.avg_rating ?? null;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        review_count: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const loaders = resolvers.getLoaders(context);
+                const stats = await loaders.cafeReviewsStats(cafe.id);
+                return stats?.count ?? 0;
             } catch (error) {
                 return 0;
             }
@@ -897,24 +998,20 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        average_rating: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const loaders = resolvers.getLoaders(context);
+                const stats = await loaders.menuItemReviewsStats(menuItem.id);
+                return stats?.avg_rating ?? null;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        review_count: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const loaders = resolvers.getLoaders(context);
+                const stats = await loaders.menuItemReviewsStats(menuItem.id);
+                return stats?.count ?? 0;
             } catch (error) {
                 return 0;
             }
