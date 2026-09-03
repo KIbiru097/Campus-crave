@@ -3,8 +3,13 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/database');
 
-// PubSub for subscriptions
-const { PubSub } = require('graphql-subscriptions');
+// PubSub for subscriptions (with fallback if dependency is omitted)
+let PubSub;
+try {
+    PubSub = require('graphql-subscriptions').PubSub;
+} catch (e) {
+    PubSub = class { publish() {} asyncIterator() {} };
+}
 const pubsub = new PubSub();
 
 // Subscription event names
@@ -38,7 +43,7 @@ setInterval(() => {
     for (const [ip, entry] of rateLimitStore) {
         if (now - entry.windowStart > RATE_LIMIT_WINDOW * 2) rateLimitStore.delete(ip);
     }
-}, 60000);
+}, 60000).unref();
 
 // Audit logging helper
 async function logAudit(userId, action, entityType, entityId, details, ipAddress) {
@@ -872,24 +877,45 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        // Request-scoped cache for cafe review stats to eliminate redundant DB queries within the same request
+        average_rating: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const ctx = context || {};
+                if (!ctx.cafeReviewStats) ctx.cafeReviewStats = new Map();
+                if (!ctx.cafeReviewStats.has(cafe.id)) {
+                    const result = await pool.query(
+                        'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                        [cafe.id]
+                    );
+                    const row = result.rows[0];
+                    const stats = {
+                        avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                        count: parseInt(row?.count) || 0
+                    };
+                    ctx.cafeReviewStats.set(cafe.id, stats);
+                }
+                return ctx.cafeReviewStats.get(cafe.id).avg_rating;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        review_count: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const ctx = context || {};
+                if (!ctx.cafeReviewStats) ctx.cafeReviewStats = new Map();
+                if (!ctx.cafeReviewStats.has(cafe.id)) {
+                    const result = await pool.query(
+                        'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                        [cafe.id]
+                    );
+                    const row = result.rows[0];
+                    const stats = {
+                        avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                        count: parseInt(row?.count) || 0
+                    };
+                    ctx.cafeReviewStats.set(cafe.id, stats);
+                }
+                return ctx.cafeReviewStats.get(cafe.id).count;
             } catch (error) {
                 return 0;
             }
@@ -897,24 +923,45 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        // Request-scoped cache for menu item review stats to eliminate redundant DB queries within the same request
+        average_rating: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const ctx = context || {};
+                if (!ctx.menuItemReviewStats) ctx.menuItemReviewStats = new Map();
+                if (!ctx.menuItemReviewStats.has(menuItem.id)) {
+                    const result = await pool.query(
+                        'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                        [menuItem.id]
+                    );
+                    const row = result.rows[0];
+                    const stats = {
+                        avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                        count: parseInt(row?.count) || 0
+                    };
+                    ctx.menuItemReviewStats.set(menuItem.id, stats);
+                }
+                return ctx.menuItemReviewStats.get(menuItem.id).avg_rating;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        review_count: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const ctx = context || {};
+                if (!ctx.menuItemReviewStats) ctx.menuItemReviewStats = new Map();
+                if (!ctx.menuItemReviewStats.has(menuItem.id)) {
+                    const result = await pool.query(
+                        'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                        [menuItem.id]
+                    );
+                    const row = result.rows[0];
+                    const stats = {
+                        avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                        count: parseInt(row?.count) || 0
+                    };
+                    ctx.menuItemReviewStats.set(menuItem.id, stats);
+                }
+                return ctx.menuItemReviewStats.get(menuItem.id).count;
             } catch (error) {
                 return 0;
             }
@@ -943,16 +990,30 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        // Request-scoped cache to prevent N+1 DB queries when resolving cafe for multiple orders in list
+        cafe: async (order, _, context) => {
             try {
+                const ctx = context || {};
+                if (!ctx.cafeCache) ctx.cafeCache = new Map();
+                if (ctx.cafeCache.has(order.cafe_id)) {
+                    return ctx.cafeCache.get(order.cafe_id);
+                }
                 const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
+                const cafe = result.rows[0] || null;
+                ctx.cafeCache.set(order.cafe_id, cafe);
+                return cafe;
             } catch (error) {
                 return null;
             }
         },
-        student: async (order) => {
+        // Request-scoped cache to prevent N+1 DB queries when resolving student for multiple orders
+        student: async (order, _, context) => {
             try {
+                const ctx = context || {};
+                if (!ctx.studentCache) ctx.studentCache = new Map();
+                if (ctx.studentCache.has(order.student_id)) {
+                    return ctx.studentCache.get(order.student_id);
+                }
                 const result = await pool.query(
                     `SELECT s.*, u.username, u.email
                      FROM students s
@@ -960,7 +1021,9 @@ const resolvers = {
                      WHERE s.id = $1 AND u.deleted_at IS NULL`,
                     [order.student_id]
                 );
-                return result.rows[0] || null;
+                const student = result.rows[0] || null;
+                ctx.studentCache.set(order.student_id, student);
+                return student;
             } catch (error) {
                 return null;
             }
