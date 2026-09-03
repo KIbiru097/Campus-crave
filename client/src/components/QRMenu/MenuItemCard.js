@@ -3,14 +3,15 @@ import { motion } from 'framer-motion';
 
 const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
 
-export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
+// ⚡ Bolt Optimization: Memoize MenuItemCard to prevent re-rendering all grid items when a single card's quantity or favorite status changes.
+function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, isFav: isFavProp, favorites, onToggleFav }) {
   const ref = useRef(null);
   const [justAdded, setJustAdded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const size = SIZES[index % SIZES.length];
   const hasDiscount = item.originalPrice && item.originalPrice > item.price;
-  const isFav = favorites && favorites.has(item.id);
+  const isFav = isFavProp !== undefined ? isFavProp : (favorites && favorites.has(item.id));
 
   const handleMouseMove = useCallback((e) => {
     if (!ref.current) return;
@@ -149,3 +150,5 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
     </motion.div>
   );
 }
+
+export default React.memo(MenuItemCard);
