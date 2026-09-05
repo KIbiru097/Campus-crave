@@ -1,0 +1,3 @@
+## 2026-09-05 - Request-Scoped GraphQL Field Resolver Caching
+**Learning:** In Apollo Server with PostgreSQL, GraphQL nested field resolvers (`Order.cafe`, `Order.student`, `Cafe.average_rating`, `Cafe.review_count`) execute separate SQL queries per item, resulting in severe N+1 database roundtrips. Storing promises in a request-scoped `Map` passed via Apollo context deduplicates concurrent database queries within a single GraphQL request without risks of cross-request stale data.
+**Action:** Always instantiate a short-lived `cache = new Map()` in Apollo context and cache query promises by key in field resolvers.
