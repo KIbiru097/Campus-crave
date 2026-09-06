@@ -164,7 +164,8 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // Instantiate request-scoped cache Map to deduplicate concurrent DB calls in GraphQL field resolvers
+                return { user, cache: new Map() };
             },
         })
     );
