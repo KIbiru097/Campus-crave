@@ -1,16 +1,16 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 
 const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
 
-export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
+// ⚡ Bolt Optimization: Memoized MenuItemCard to avoid unnecessary re-renders when parent state updates.
+const MenuItemCard = memo(function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, isFav, onToggleFav }) {
   const ref = useRef(null);
   const [justAdded, setJustAdded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const size = SIZES[index % SIZES.length];
   const hasDiscount = item.originalPrice && item.originalPrice > item.price;
-  const isFav = favorites && favorites.has(item.id);
 
   const handleMouseMove = useCallback((e) => {
     if (!ref.current) return;
@@ -148,4 +148,6 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
       </div>
     </motion.div>
   );
-}
+});
+
+export default MenuItemCard;
