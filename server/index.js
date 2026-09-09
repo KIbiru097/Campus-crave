@@ -164,7 +164,8 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // ⚡ Bolt Optimization: Instantiate a request-scoped Map cache
+                return { user, cache: new Map() };
             },
         })
     );
