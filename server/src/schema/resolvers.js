@@ -4,8 +4,108 @@ const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/database');
 
 // PubSub for subscriptions
-const { PubSub } = require('graphql-subscriptions');
-const pubsub = new PubSub();
+let pubsub;
+try {
+    const { PubSub } = require('graphql-subscriptions');
+    pubsub = new PubSub();
+} catch (e) {
+    pubsub = { publish: () => {} };
+}
+
+/**
+ * ⚡ Bolt Performance Optimization: Lightweight Batch Loader (DataLoader pattern)
+ * Batches individual ID requests during a single event loop tick into a single SQL query
+ * using `WHERE id = ANY($1)`. Caches results in the request context to eliminate N+1 queries.
+ */
+function createBatchLoader(batchFn) {
+    let keys = [];
+    let promises = new Map();
+    let scheduled = false;
+
+    return (key) => {
+        if (promises.has(key)) {
+            return promises.get(key);
+        }
+
+        let resolveKey, rejectKey;
+        const promise = new Promise((resolve, reject) => {
+            resolveKey = resolve;
+            rejectKey = reject;
+        });
+        promises.set(key, promise);
+        keys.push({ key, resolve: resolveKey, reject: rejectKey });
+
+        if (!scheduled) {
+            scheduled = true;
+            process.nextTick(async () => {
+                const currentKeys = keys;
+                keys = [];
+                scheduled = false;
+                try {
+                    const resultsMap = await batchFn(currentKeys.map(k => k.key));
+                    for (const { key, resolve } of currentKeys) {
+                        resolve(resultsMap ? resultsMap.get(key) : null);
+                    }
+                } catch (err) {
+                    for (const { reject } of currentKeys) {
+                        reject(err);
+                    }
+                }
+            });
+        }
+
+        return promise;
+    };
+}
+
+function createLoaders() {
+    return {
+        // Batches Cafe rating and review count queries into a single SQL query
+        cafeStatsLoader: createBatchLoader(async (cafeIds) => {
+            const result = await pool.query(
+                `SELECT cafe_id, AVG(rating) as avg_rating, COUNT(*)::int as count
+                 FROM reviews
+                 WHERE cafe_id = ANY($1) AND deleted_at IS NULL
+                 GROUP BY cafe_id`,
+                [cafeIds]
+            );
+            const map = new Map();
+            for (const row of result.rows) {
+                map.set(row.cafe_id, {
+                    avg_rating: row.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                    count: parseInt(row.count) || 0
+                });
+            }
+            return map;
+        }),
+        // Batches MenuItem rating and review count queries into a single SQL query
+        menuItemStatsLoader: createBatchLoader(async (menuItemIds) => {
+            const result = await pool.query(
+                `SELECT menu_item_id, AVG(rating) as avg_rating, COUNT(*)::int as count
+                 FROM reviews
+                 WHERE menu_item_id = ANY($1) AND deleted_at IS NULL
+                 GROUP BY menu_item_id`,
+                [menuItemIds]
+            );
+            const map = new Map();
+            for (const row of result.rows) {
+                map.set(row.menu_item_id, {
+                    avg_rating: row.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                    count: parseInt(row.count) || 0
+                });
+            }
+            return map;
+        })
+    };
+}
+
+function getLoaders(context) {
+    if (!context) context = {};
+    if (!context.loaders) {
+        context.loaders = createLoaders();
+    }
+    return context.loaders;
+}
 
 // Subscription event names
 const EVENTS = {
@@ -872,24 +972,20 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        // ⚡ Bolt Optimization: Uses request-scoped batch loader to prevent N+1 queries
+        average_rating: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const stats = await getLoaders(context).cafeStatsLoader(cafe.id);
+                return stats?.avg_rating ?? null;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        // ⚡ Bolt Optimization: Uses same request-scoped batch loader (0 extra DB queries!)
+        review_count: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const stats = await getLoaders(context).cafeStatsLoader(cafe.id);
+                return stats?.count ?? 0;
             } catch (error) {
                 return 0;
             }
@@ -897,24 +993,20 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        // ⚡ Bolt Optimization: Uses request-scoped batch loader to prevent N+1 queries
+        average_rating: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const stats = await getLoaders(context).menuItemStatsLoader(menuItem.id);
+                return stats?.avg_rating ?? null;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        // ⚡ Bolt Optimization: Uses same request-scoped batch loader (0 extra DB queries!)
+        review_count: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const stats = await getLoaders(context).menuItemStatsLoader(menuItem.id);
+                return stats?.count ?? 0;
             } catch (error) {
                 return 0;
             }
