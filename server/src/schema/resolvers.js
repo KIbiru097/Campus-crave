@@ -99,6 +99,45 @@ const checkUserOwnsCafe = async (userId, cafeId) => {
     return result.rows.length > 0;
 };
 
+// ⚡ Bolt: Request-scoped helpers to deduplicate review stats DB queries per request
+const getCafeReviewStats = (cafeId, context) => {
+    if (!context || !context.cafeStatsCache) {
+        return pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+            [cafeId]
+        );
+    }
+    if (!context.cafeStatsCache.has(cafeId)) {
+        context.cafeStatsCache.set(
+            cafeId,
+            pool.query(
+                'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                [cafeId]
+            )
+        );
+    }
+    return context.cafeStatsCache.get(cafeId);
+};
+
+const getMenuItemReviewStats = (menuItemId, context) => {
+    if (!context || !context.menuItemStatsCache) {
+        return pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+            [menuItemId]
+        );
+    }
+    if (!context.menuItemStatsCache.has(menuItemId)) {
+        context.menuItemStatsCache.set(
+            menuItemId,
+            pool.query(
+                'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                [menuItemId]
+            )
+        );
+    }
+    return context.menuItemStatsCache.get(menuItemId);
+};
+
 const resolvers = {
     // ============== QUERY RESOLVERS ==============
     
@@ -872,23 +911,17 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        average_rating: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
+                const result = await getCafeReviewStats(cafe.id, context);
                 return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        review_count: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
+                const result = await getCafeReviewStats(cafe.id, context);
                 return parseInt(result.rows[0]?.count) || 0;
             } catch (error) {
                 return 0;
@@ -897,23 +930,17 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        average_rating: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
+                const result = await getMenuItemReviewStats(menuItem.id, context);
                 return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        review_count: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
+                const result = await getMenuItemReviewStats(menuItem.id, context);
                 return parseInt(result.rows[0]?.count) || 0;
             } catch (error) {
                 return 0;
