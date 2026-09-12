@@ -202,7 +202,9 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // Bolt: Request-scoped cache map to eliminate duplicate DB queries across field resolvers (N+1 query optimization)
+                const loaderCache = new Map();
+                return { user, loaderCache };
             },
         })
     );
