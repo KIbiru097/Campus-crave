@@ -943,16 +943,27 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        // Optimization: Use request-scoped dataCache to deduplicate database queries (solving N+1 overhead)
+        cafe: async (order, _, context) => {
             try {
+                const cacheKey = `cafe:${order.cafe_id}`;
+                if (context?.dataCache?.has(cacheKey)) {
+                    return context.dataCache.get(cacheKey);
+                }
                 const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
+                const cafe = result.rows[0] || null;
+                if (context?.dataCache) context.dataCache.set(cacheKey, cafe);
+                return cafe;
             } catch (error) {
                 return null;
             }
         },
-        student: async (order) => {
+        student: async (order, _, context) => {
             try {
+                const cacheKey = `student:${order.student_id}`;
+                if (context?.dataCache?.has(cacheKey)) {
+                    return context.dataCache.get(cacheKey);
+                }
                 const result = await pool.query(
                     `SELECT s.*, u.username, u.email
                      FROM students s
@@ -960,13 +971,19 @@ const resolvers = {
                      WHERE s.id = $1 AND u.deleted_at IS NULL`,
                     [order.student_id]
                 );
-                return result.rows[0] || null;
+                const student = result.rows[0] || null;
+                if (context?.dataCache) context.dataCache.set(cacheKey, student);
+                return student;
             } catch (error) {
                 return null;
             }
         },
-        items: async (order) => {
+        items: async (order, _, context) => {
             try {
+                const cacheKey = `order_items:${order.id}`;
+                if (context?.dataCache?.has(cacheKey)) {
+                    return context.dataCache.get(cacheKey);
+                }
                 const result = await pool.query(
                     `SELECT oi.*, mi.name, mi.price as current_price, mi.category
                      FROM order_items oi
@@ -974,23 +991,37 @@ const resolvers = {
                      WHERE oi.order_id = $1 AND mi.deleted_at IS NULL`,
                     [order.id]
                 );
-                return result.rows;
+                const items = result.rows;
+                if (context?.dataCache) context.dataCache.set(cacheKey, items);
+                return items;
             } catch (error) {
                 return [];
             }
         },
-        payment: async (order) => {
+        payment: async (order, _, context) => {
             try {
+                const cacheKey = `payment:${order.id}`;
+                if (context?.dataCache?.has(cacheKey)) {
+                    return context.dataCache.get(cacheKey);
+                }
                 const result = await pool.query('SELECT * FROM payments WHERE order_id = $1', [order.id]);
-                return result.rows[0];
+                const payment = result.rows[0] || null;
+                if (context?.dataCache) context.dataCache.set(cacheKey, payment);
+                return payment;
             } catch (error) {
                 return null;
             }
         },
-        delivery: async (order) => {
+        delivery: async (order, _, context) => {
             try {
+                const cacheKey = `delivery:${order.id}`;
+                if (context?.dataCache?.has(cacheKey)) {
+                    return context.dataCache.get(cacheKey);
+                }
                 const result = await pool.query('SELECT * FROM deliveries WHERE order_id = $1', [order.id]);
-                return result.rows[0];
+                const delivery = result.rows[0] || null;
+                if (context?.dataCache) context.dataCache.set(cacheKey, delivery);
+                return delivery;
             } catch (error) {
                 return null;
             }
@@ -998,8 +1029,12 @@ const resolvers = {
     },
 
     Delivery: {
-        order: async (delivery) => {
+        order: async (delivery, _, context) => {
             try {
+                const cacheKey = `order:${delivery.order_id}`;
+                if (context?.dataCache?.has(cacheKey)) {
+                    return context.dataCache.get(cacheKey);
+                }
                 const result = await pool.query(
                     `SELECT o.*, c.name as cafe_name, c.location as cafe_location
                      FROM orders o
@@ -1007,29 +1042,43 @@ const resolvers = {
                      WHERE o.id = $1 AND o.deleted_at IS NULL`,
                     [delivery.order_id]
                 );
-                return result.rows[0] || null;
+                const order = result.rows[0] || null;
+                if (context?.dataCache) context.dataCache.set(cacheKey, order);
+                return order;
             } catch (error) {
                 return null;
             }
         },
-        delivery_person: async (delivery) => {
+        delivery_person: async (delivery, _, context) => {
             try {
+                const cacheKey = `user:${delivery.delivery_person_id}`;
+                if (context?.dataCache?.has(cacheKey)) {
+                    return context.dataCache.get(cacheKey);
+                }
                 const result = await pool.query(
                     'SELECT id, username, email, phone, role FROM users WHERE id = $1',
                     [delivery.delivery_person_id]
                 );
-                return result.rows[0] || null;
+                const user = result.rows[0] || null;
+                if (context?.dataCache) context.dataCache.set(cacheKey, user);
+                return user;
             } catch (error) {
                 return null;
             }
         },
-        assigner: async (delivery) => {
+        assigner: async (delivery, _, context) => {
             try {
+                const cacheKey = `user:${delivery.assigned_by}`;
+                if (context?.dataCache?.has(cacheKey)) {
+                    return context.dataCache.get(cacheKey);
+                }
                 const result = await pool.query(
                     'SELECT id, username, email, phone, role FROM users WHERE id = $1',
                     [delivery.assigned_by]
                 );
-                return result.rows[0] || null;
+                const user = result.rows[0] || null;
+                if (context?.dataCache) context.dataCache.set(cacheKey, user);
+                return user;
             } catch (error) {
                 return null;
             }
