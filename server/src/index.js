@@ -4,7 +4,7 @@ const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@apollo/server/express4');
 const cors = require('cors');
 const typeDefs = require('./schema/typeDefs');
-const { resolvers, getUserFromToken } = require('./schema/resolvers');
+const { resolvers, getUserFromToken, createLoaders } = require('./schema/resolvers');
 const MockPaymentService = require('./services/mockPaymentService');
 
 const app = express();
@@ -202,7 +202,8 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                const loaders = createLoaders();
+                return { user, loaders };
             },
         })
     );
