@@ -1,0 +1,3 @@
+## 2026-09-14 - Request-Scoped Batching for GraphQL N+1 Queries
+**Learning:** In GraphQL schemas with nested field resolvers (such as `Cafe.menu_items`, `Cafe.average_rating`, `MenuItem.average_rating`, and `Order` field resolvers), querying lists of items without batching causes severe N+1 database queries (e.g., 100+ DB queries for a single list query). Using a zero-dependency request-scoped batch loader created inside Apollo Server context (`process.nextTick` batching) consolidates parallel resolver lookups per event loop tick into single SQL queries using `ANY($1)` and `GROUP BY`.
+**Action:** Always instantiate request-scoped loaders in Apollo context and check `context.loaders` inside nested field resolvers before falling back to individual database queries.

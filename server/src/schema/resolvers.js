@@ -99,6 +99,152 @@ const checkUserOwnsCafe = async (userId, cafeId) => {
     return result.rows.length > 0;
 };
 
+// ⚡ Utility function to batch individual load requests into a single database query per tick (solves N+1 queries)
+function createBatchLoader(batchFn) {
+    let keys = [];
+    let promises = [];
+    let scheduled = false;
+
+    return function load(key) {
+        return new Promise((resolve, reject) => {
+            keys.push(key);
+            promises.push({ resolve, reject });
+
+            if (!scheduled) {
+                scheduled = true;
+                process.nextTick(async () => {
+                    const currentKeys = keys;
+                    const currentPromises = promises;
+                    keys = [];
+                    promises = [];
+                    scheduled = false;
+
+                    try {
+                        const uniqueKeys = Array.from(new Set(currentKeys));
+                        const batchResults = await batchFn(uniqueKeys);
+
+                        const resultMap = new Map();
+                        uniqueKeys.forEach((k, idx) => {
+                            resultMap.set(k, batchResults[idx]);
+                        });
+
+                        currentPromises.forEach((p, i) => {
+                            p.resolve(resultMap.get(currentKeys[i]));
+                        });
+                    } catch (err) {
+                        currentPromises.forEach((p) => p.reject(err));
+                    }
+                });
+            }
+        });
+    };
+}
+
+// ⚡ Factory function to create request-scoped batch loaders
+function createLoaders() {
+    return {
+        cafeMenuItems: createBatchLoader(async (cafeIds) => {
+            const result = await pool.query(
+                "SELECT * FROM menu_items WHERE cafe_id = ANY($1) AND deleted_at IS NULL AND status = $2 ORDER BY category, name",
+                [cafeIds, 'Available']
+            );
+            const map = new Map();
+            cafeIds.forEach(id => map.set(id, []));
+            result.rows.forEach(row => {
+                if (map.has(row.cafe_id)) map.get(row.cafe_id).push(row);
+            });
+            return cafeIds.map(id => map.get(id));
+        }),
+
+        cafeStats: createBatchLoader(async (cafeIds) => {
+            const result = await pool.query(
+                "SELECT cafe_id, AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = ANY($1) AND deleted_at IS NULL GROUP BY cafe_id",
+                [cafeIds]
+            );
+            const map = new Map();
+            result.rows.forEach(row => {
+                const avg = row.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null;
+                const cnt = parseInt(row.count) || 0;
+                map.set(row.cafe_id, { avg_rating: avg, count: cnt });
+            });
+            return cafeIds.map(id => map.get(id) || { avg_rating: null, count: 0 });
+        }),
+
+        menuItemStats: createBatchLoader(async (menuItemIds) => {
+            const result = await pool.query(
+                "SELECT menu_item_id, AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = ANY($1) AND deleted_at IS NULL GROUP BY menu_item_id",
+                [menuItemIds]
+            );
+            const map = new Map();
+            result.rows.forEach(row => {
+                const avg = row.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null;
+                const cnt = parseInt(row.count) || 0;
+                map.set(row.menu_item_id, { avg_rating: avg, count: cnt });
+            });
+            return menuItemIds.map(id => map.get(id) || { avg_rating: null, count: 0 });
+        }),
+
+        orderCafe: createBatchLoader(async (cafeIds) => {
+            const result = await pool.query(
+                'SELECT * FROM cafes WHERE id = ANY($1) AND deleted_at IS NULL',
+                [cafeIds]
+            );
+            const map = new Map();
+            result.rows.forEach(row => map.set(row.id, row));
+            return cafeIds.map(id => map.get(id) || null);
+        }),
+
+        orderStudent: createBatchLoader(async (studentIds) => {
+            const result = await pool.query(
+                `SELECT s.*, u.username, u.email
+                 FROM students s
+                 JOIN users u ON s.user_id = u.id
+                 WHERE s.id = ANY($1) AND u.deleted_at IS NULL`,
+                [studentIds]
+            );
+            const map = new Map();
+            result.rows.forEach(row => map.set(row.id, row));
+            return studentIds.map(id => map.get(id) || null);
+        }),
+
+        orderItems: createBatchLoader(async (orderIds) => {
+            const result = await pool.query(
+                `SELECT oi.*, mi.name, mi.price as current_price, mi.category
+                 FROM order_items oi
+                 JOIN menu_items mi ON oi.menu_item_id = mi.id
+                 WHERE oi.order_id = ANY($1) AND mi.deleted_at IS NULL`,
+                [orderIds]
+            );
+            const map = new Map();
+            orderIds.forEach(id => map.set(id, []));
+            result.rows.forEach(row => {
+                if (map.has(row.order_id)) map.get(row.order_id).push(row);
+            });
+            return orderIds.map(id => map.get(id));
+        }),
+
+        orderPayment: createBatchLoader(async (orderIds) => {
+            const result = await pool.query(
+                'SELECT * FROM payments WHERE order_id = ANY($1)',
+                [orderIds]
+            );
+            const map = new Map();
+            result.rows.forEach(row => map.set(row.order_id, row));
+            return orderIds.map(id => map.get(id) || null);
+        }),
+
+        orderDelivery: createBatchLoader(async (orderIds) => {
+            const result = await pool.query(
+                'SELECT * FROM deliveries WHERE order_id = ANY($1)',
+                [orderIds]
+            );
+            const map = new Map();
+            result.rows.forEach(row => map.set(row.order_id, row));
+            return orderIds.map(id => map.get(id) || null);
+        }),
+    };
+}
+
 const resolvers = {
     // ============== QUERY RESOLVERS ==============
     
@@ -861,8 +1007,12 @@ const resolvers = {
     // ============== FIELD RESOLVERS ==============
     
     Cafe: {
-        menu_items: async (cafe) => {
+        // ⚡ Batch-loader optimized: combines queries for list items into a single SQL query per tick
+        menu_items: async (cafe, _, context) => {
             try {
+                if (context?.loaders?.cafeMenuItems) {
+                    return await context.loaders.cafeMenuItems(cafe.id);
+                }
                 const result = await pool.query(
                     'SELECT * FROM menu_items WHERE cafe_id = $1 AND deleted_at IS NULL AND status = $2 ORDER BY category, name',
                     [cafe.id, 'Available']
@@ -872,8 +1022,12 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        average_rating: async (cafe, _, context) => {
             try {
+                if (context?.loaders?.cafeStats) {
+                    const stats = await context.loaders.cafeStats(cafe.id);
+                    return stats.avg_rating;
+                }
                 const result = await pool.query(
                     'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
                     [cafe.id]
@@ -883,8 +1037,12 @@ const resolvers = {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        review_count: async (cafe, _, context) => {
             try {
+                if (context?.loaders?.cafeStats) {
+                    const stats = await context.loaders.cafeStats(cafe.id);
+                    return stats.count;
+                }
                 const result = await pool.query(
                     'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
                     [cafe.id]
@@ -897,8 +1055,13 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        // ⚡ Batch-loader optimized: avoids N+1 review queries for menu item lists
+        average_rating: async (menuItem, _, context) => {
             try {
+                if (context?.loaders?.menuItemStats) {
+                    const stats = await context.loaders.menuItemStats(menuItem.id);
+                    return stats.avg_rating;
+                }
                 const result = await pool.query(
                     'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
                     [menuItem.id]
@@ -908,8 +1071,12 @@ const resolvers = {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        review_count: async (menuItem, _, context) => {
             try {
+                if (context?.loaders?.menuItemStats) {
+                    const stats = await context.loaders.menuItemStats(menuItem.id);
+                    return stats.count;
+                }
                 const result = await pool.query(
                     'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
                     [menuItem.id]
@@ -943,16 +1110,23 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        // ⚡ Batch-loader optimized: batch loads related order entities across order lists
+        cafe: async (order, _, context) => {
             try {
+                if (context?.loaders?.orderCafe) {
+                    return await context.loaders.orderCafe(order.cafe_id);
+                }
                 const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
                 return result.rows[0];
             } catch (error) {
                 return null;
             }
         },
-        student: async (order) => {
+        student: async (order, _, context) => {
             try {
+                if (context?.loaders?.orderStudent) {
+                    return await context.loaders.orderStudent(order.student_id);
+                }
                 const result = await pool.query(
                     `SELECT s.*, u.username, u.email
                      FROM students s
@@ -965,8 +1139,11 @@ const resolvers = {
                 return null;
             }
         },
-        items: async (order) => {
+        items: async (order, _, context) => {
             try {
+                if (context?.loaders?.orderItems) {
+                    return await context.loaders.orderItems(order.id);
+                }
                 const result = await pool.query(
                     `SELECT oi.*, mi.name, mi.price as current_price, mi.category
                      FROM order_items oi
@@ -979,16 +1156,22 @@ const resolvers = {
                 return [];
             }
         },
-        payment: async (order) => {
+        payment: async (order, _, context) => {
             try {
+                if (context?.loaders?.orderPayment) {
+                    return await context.loaders.orderPayment(order.id);
+                }
                 const result = await pool.query('SELECT * FROM payments WHERE order_id = $1', [order.id]);
                 return result.rows[0];
             } catch (error) {
                 return null;
             }
         },
-        delivery: async (order) => {
+        delivery: async (order, _, context) => {
             try {
+                if (context?.loaders?.orderDelivery) {
+                    return await context.loaders.orderDelivery(order.id);
+                }
                 const result = await pool.query('SELECT * FROM deliveries WHERE order_id = $1', [order.id]);
                 return result.rows[0];
             } catch (error) {
@@ -2021,4 +2204,4 @@ const resolvers = {
     }
 };
 
-module.exports = { resolvers, getUserFromToken };
+module.exports = { resolvers, getUserFromToken, createLoaders };
