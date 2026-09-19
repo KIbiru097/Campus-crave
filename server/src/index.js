@@ -202,7 +202,13 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // ⚡ Bolt Optimization: Instantiate short-lived, request-scoped caches for field resolvers
+                // to deduplicate database queries within a single GraphQL request execution context.
+                return {
+                    user,
+                    cafeReviewStatsCache: new Map(),
+                    menuItemReviewStatsCache: new Map(),
+                };
             },
         })
     );
