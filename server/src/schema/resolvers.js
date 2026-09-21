@@ -99,6 +99,55 @@ const checkUserOwnsCafe = async (userId, cafeId) => {
     return result.rows.length > 0;
 };
 
+// ⚡ Bolt: Request-scoped cache helpers to deduplicate queries & fix N+1 issues in field resolvers
+async function getCafeReviewStats(cafeId, context) {
+    const cacheKey = `cafe_review_stats_${cafeId}`;
+    if (context?.loaderCache?.has(cacheKey)) {
+        return context.loaderCache.get(cacheKey);
+    }
+    const promise = (async () => {
+        try {
+            const result = await pool.query(
+                'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                [cafeId]
+            );
+            const row = result.rows[0];
+            return {
+                average_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                review_count: parseInt(row?.count) || 0
+            };
+        } catch (error) {
+            return { average_rating: null, review_count: 0 };
+        }
+    })();
+    if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+    return promise;
+}
+
+async function getMenuItemReviewStats(menuItemId, context) {
+    const cacheKey = `menu_item_review_stats_${menuItemId}`;
+    if (context?.loaderCache?.has(cacheKey)) {
+        return context.loaderCache.get(cacheKey);
+    }
+    const promise = (async () => {
+        try {
+            const result = await pool.query(
+                'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                [menuItemId]
+            );
+            const row = result.rows[0];
+            return {
+                average_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                review_count: parseInt(row?.count) || 0
+            };
+        } catch (error) {
+            return { average_rating: null, review_count: 0 };
+        }
+    })();
+    if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+    return promise;
+}
+
 const resolvers = {
     // ============== QUERY RESOLVERS ==============
     
@@ -872,52 +921,26 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
-            try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
-            } catch (error) {
-                return null;
-            }
+        // ⚡ Bolt: Combines AVG(rating) and COUNT(*) into a single cached query per request
+        average_rating: async (cafe, _, context) => {
+            const stats = await getCafeReviewStats(cafe.id, context);
+            return stats.average_rating;
         },
-        review_count: async (cafe) => {
-            try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
-            } catch (error) {
-                return 0;
-            }
+        review_count: async (cafe, _, context) => {
+            const stats = await getCafeReviewStats(cafe.id, context);
+            return stats.review_count;
         },
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
-            try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
-            } catch (error) {
-                return null;
-            }
+        // ⚡ Bolt: Combines AVG(rating) and COUNT(*) into a single cached query per request
+        average_rating: async (menuItem, _, context) => {
+            const stats = await getMenuItemReviewStats(menuItem.id, context);
+            return stats.average_rating;
         },
-        review_count: async (menuItem) => {
-            try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
-            } catch (error) {
-                return 0;
-            }
+        review_count: async (menuItem, _, context) => {
+            const stats = await getMenuItemReviewStats(menuItem.id, context);
+            return stats.review_count;
         },
     },
     
@@ -943,27 +966,43 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
-            try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
-            } catch (error) {
-                return null;
-            }
+        // ⚡ Bolt: Deduplicates repeated cafe lookups across orders in a request
+        cafe: async (order, _, context) => {
+            if (!order.cafe_id) return null;
+            const cacheKey = `cafe_active_${order.cafe_id}`;
+            if (context?.loaderCache?.has(cacheKey)) return context.loaderCache.get(cacheKey);
+            const promise = (async () => {
+                try {
+                    const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+            return promise;
         },
-        student: async (order) => {
-            try {
-                const result = await pool.query(
-                    `SELECT s.*, u.username, u.email
-                     FROM students s
-                     JOIN users u ON s.user_id = u.id
-                     WHERE s.id = $1 AND u.deleted_at IS NULL`,
-                    [order.student_id]
-                );
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
-            }
+        // ⚡ Bolt: Deduplicates repeated student lookups across orders in a request
+        student: async (order, _, context) => {
+            if (!order.student_id) return null;
+            const cacheKey = `student_active_${order.student_id}`;
+            if (context?.loaderCache?.has(cacheKey)) return context.loaderCache.get(cacheKey);
+            const promise = (async () => {
+                try {
+                    const result = await pool.query(
+                        `SELECT s.*, u.username, u.email
+                         FROM students s
+                         JOIN users u ON s.user_id = u.id
+                         WHERE s.id = $1 AND u.deleted_at IS NULL`,
+                        [order.student_id]
+                    );
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+            return promise;
         },
         items: async (order) => {
             try {
@@ -1012,75 +1051,116 @@ const resolvers = {
                 return null;
             }
         },
-        delivery_person: async (delivery) => {
-            try {
-                const result = await pool.query(
-                    'SELECT id, username, email, phone, role FROM users WHERE id = $1',
-                    [delivery.delivery_person_id]
-                );
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
-            }
+        // ⚡ Bolt: Deduplicates user lookups across deliveries in a request
+        delivery_person: async (delivery, _, context) => {
+            if (!delivery.delivery_person_id) return null;
+            const cacheKey = `user_full_${delivery.delivery_person_id}`;
+            if (context?.loaderCache?.has(cacheKey)) return context.loaderCache.get(cacheKey);
+            const promise = (async () => {
+                try {
+                    const result = await pool.query(
+                        'SELECT id, username, email, phone, role FROM users WHERE id = $1',
+                        [delivery.delivery_person_id]
+                    );
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+            return promise;
         },
-        assigner: async (delivery) => {
-            try {
-                const result = await pool.query(
-                    'SELECT id, username, email, phone, role FROM users WHERE id = $1',
-                    [delivery.assigned_by]
-                );
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
-            }
+        assigner: async (delivery, _, context) => {
+            if (!delivery.assigned_by) return null;
+            const cacheKey = `user_full_${delivery.assigned_by}`;
+            if (context?.loaderCache?.has(cacheKey)) return context.loaderCache.get(cacheKey);
+            const promise = (async () => {
+                try {
+                    const result = await pool.query(
+                        'SELECT id, username, email, phone, role FROM users WHERE id = $1',
+                        [delivery.assigned_by]
+                    );
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+            return promise;
         },
     },
 
     AuditLog: {
-        user: async (log) => {
-            try {
-                if (!log.user_id) return null;
-                const result = await pool.query(
-                    'SELECT id, username, email, role FROM users WHERE id = $1',
-                    [log.user_id]
-                );
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
-            }
+        user: async (log, _, context) => {
+            if (!log.user_id) return null;
+            const cacheKey = `user_full_${log.user_id}`;
+            if (context?.loaderCache?.has(cacheKey)) return context.loaderCache.get(cacheKey);
+            const promise = (async () => {
+                try {
+                    const result = await pool.query(
+                        'SELECT id, username, email, phone, role FROM users WHERE id = $1',
+                        [log.user_id]
+                    );
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+            return promise;
         },
     },
 
     Review: {
-        student: async (review) => {
-            try {
-                const result = await pool.query(
-                    `SELECT s.*, u.username, u.email FROM students s
-                     JOIN users u ON s.user_id = u.id WHERE s.id = $1`,
-                    [review.student_id]
-                );
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
-            }
+        // ⚡ Bolt: Deduplicates student, cafe, and menuItem lookups across reviews in a request
+        student: async (review, _, context) => {
+            if (!review.student_id) return null;
+            const cacheKey = `student_active_${review.student_id}`;
+            if (context?.loaderCache?.has(cacheKey)) return context.loaderCache.get(cacheKey);
+            const promise = (async () => {
+                try {
+                    const result = await pool.query(
+                        `SELECT s.*, u.username, u.email FROM students s
+                         JOIN users u ON s.user_id = u.id WHERE s.id = $1 AND u.deleted_at IS NULL`,
+                        [review.student_id]
+                    );
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+            return promise;
         },
-        cafe: async (review) => {
+        cafe: async (review, _, context) => {
             if (!review.cafe_id) return null;
-            try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1', [review.cafe_id]);
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
-            }
+            const cacheKey = `cafe_any_${review.cafe_id}`;
+            if (context?.loaderCache?.has(cacheKey)) return context.loaderCache.get(cacheKey);
+            const promise = (async () => {
+                try {
+                    const result = await pool.query('SELECT * FROM cafes WHERE id = $1', [review.cafe_id]);
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+            return promise;
         },
-        menu_item: async (review) => {
+        menu_item: async (review, _, context) => {
             if (!review.menu_item_id) return null;
-            try {
-                const result = await pool.query('SELECT * FROM menu_items WHERE id = $1', [review.menu_item_id]);
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
-            }
+            const cacheKey = `menu_item_by_id_${review.menu_item_id}`;
+            if (context?.loaderCache?.has(cacheKey)) return context.loaderCache.get(cacheKey);
+            const promise = (async () => {
+                try {
+                    const result = await pool.query('SELECT * FROM menu_items WHERE id = $1', [review.menu_item_id]);
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.loaderCache) context.loaderCache.set(cacheKey, promise);
+            return promise;
         },
     },
     

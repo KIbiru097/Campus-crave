@@ -202,7 +202,8 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // ⚡ Bolt: Request-scoped cache to prevent N+1 queries in field resolvers
+                return { user, loaderCache: new Map() };
             },
         })
     );
