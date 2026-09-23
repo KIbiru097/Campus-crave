@@ -202,7 +202,19 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // ⚡ PERF OPTIMIZATION: Request-scoped cache map to prevent N+1 queries and deduplicate DB calls
+                const cache = new Map();
+                const loaders = {
+                    load: async (key, fetchFn) => {
+                        if (cache.has(key)) {
+                            return cache.get(key);
+                        }
+                        const promise = fetchFn();
+                        cache.set(key, promise);
+                        return promise;
+                    }
+                };
+                return { user, loaders };
             },
         })
     );

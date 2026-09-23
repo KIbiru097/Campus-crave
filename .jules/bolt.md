@@ -1,0 +1,3 @@
+## 2026-09-23 - GraphQL Field Resolver Query Deduplication
+**Learning:** Nested GraphQL field resolvers (e.g. `Order.cafe`, `Order.student`, `Order.items`) execute independently for every returned list item, creating severe N+1 database query bottlenecks. Instantiating a request-scoped promise cache Map in the Apollo Server context allows field resolvers to deduplicate identical database queries within a single HTTP request without global state leakages.
+**Action:** Always wrap relational field resolvers with a request-scoped promise cache helper (`context.loaders.load(key, fetchFn)`) in Node.js GraphQL servers to eliminate N+1 queries safely.
