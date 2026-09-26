@@ -1,0 +1,3 @@
+## 2026-09-26 - Request-Scoped Promise Deduplication for GraphQL Field Resolvers
+**Learning:** GraphQL field resolvers in Node.js fire concurrently via `Promise.all`. Without external dependencies like DataLoader, instantiating `cache: new Map()` in Apollo context and storing the in-flight *Promise* (rather than the resolved value) in `getCached` allows concurrent field resolvers within the same tick to attach to the same pending query, eliminating N+1 database calls and query duplication across parallel field resolutions.
+**Action:** Always store the pending `Promise` in `context.cache` before awaiting it, and ensure `.catch()` purges the key on error so rejections don't poison the request cache.
