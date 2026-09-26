@@ -99,6 +99,70 @@ const checkUserOwnsCafe = async (userId, cafeId) => {
     return result.rows.length > 0;
 };
 
+// Request-scoped caching helper functions to avoid N+1 queries and deduplicate
+// concurrent reviews aggregation queries for Cafes and MenuItems.
+async function getCafeReviewStats(cafeId, context) {
+    if (context) {
+        if (!context.cafeReviewStatsCache) {
+            context.cafeReviewStatsCache = new Map();
+        }
+        if (context.cafeReviewStatsCache.has(cafeId)) {
+            return context.cafeReviewStatsCache.get(cafeId);
+        }
+    }
+
+    const queryPromise = (async () => {
+        try {
+            const result = await pool.query(
+                'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                [cafeId]
+            );
+            const avgRating = result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+            const count = parseInt(result.rows[0]?.count) || 0;
+            return { avgRating, count };
+        } catch (error) {
+            return { avgRating: null, count: 0 };
+        }
+    })();
+
+    if (context && context.cafeReviewStatsCache) {
+        context.cafeReviewStatsCache.set(cafeId, queryPromise);
+    }
+
+    return queryPromise;
+}
+
+async function getMenuItemReviewStats(menuItemId, context) {
+    if (context) {
+        if (!context.menuItemReviewStatsCache) {
+            context.menuItemReviewStatsCache = new Map();
+        }
+        if (context.menuItemReviewStatsCache.has(menuItemId)) {
+            return context.menuItemReviewStatsCache.get(menuItemId);
+        }
+    }
+
+    const queryPromise = (async () => {
+        try {
+            const result = await pool.query(
+                'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                [menuItemId]
+            );
+            const avgRating = result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+            const count = parseInt(result.rows[0]?.count) || 0;
+            return { avgRating, count };
+        } catch (error) {
+            return { avgRating: null, count: 0 };
+        }
+    })();
+
+    if (context && context.menuItemReviewStatsCache) {
+        context.menuItemReviewStatsCache.set(menuItemId, queryPromise);
+    }
+
+    return queryPromise;
+}
+
 const resolvers = {
     // ============== QUERY RESOLVERS ==============
     
@@ -872,52 +936,28 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
-            try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
-            } catch (error) {
-                return null;
-            }
+        // ⚡ OPTIMIZATION: Memoized aggregate query deduplication
+        // Single database query fetches both avg_rating and review_count per request
+        average_rating: async (cafe, _, context) => {
+            const stats = await getCafeReviewStats(cafe.id, context);
+            return stats.avgRating;
         },
-        review_count: async (cafe) => {
-            try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
-            } catch (error) {
-                return 0;
-            }
+        review_count: async (cafe, _, context) => {
+            const stats = await getCafeReviewStats(cafe.id, context);
+            return stats.count;
         },
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
-            try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
-            } catch (error) {
-                return null;
-            }
+        // ⚡ OPTIMIZATION: Memoized aggregate query deduplication
+        // Single database query fetches both avg_rating and review_count per request
+        average_rating: async (menuItem, _, context) => {
+            const stats = await getMenuItemReviewStats(menuItem.id, context);
+            return stats.avgRating;
         },
-        review_count: async (menuItem) => {
-            try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
-            } catch (error) {
-                return 0;
-            }
+        review_count: async (menuItem, _, context) => {
+            const stats = await getMenuItemReviewStats(menuItem.id, context);
+            return stats.count;
         },
     },
     

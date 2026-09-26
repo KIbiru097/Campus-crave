@@ -1,0 +1,3 @@
+## 2025-05-18 - Deduplicating GraphQL Field Resolvers via Request-Scoped Cache
+**Learning:** In GraphQL schemas where multiple field resolvers (`average_rating` and `review_count`) query the same underlying table (`reviews`) for an entity (`Cafe` or `MenuItem`), separate resolvers cause redundant database queries. Fetching both rating and count in a single SQL query and memoizing the result in a request-scoped cache (attached lazily to `context`) halves the number of DB queries per request without needing external batching libraries.
+**Action:** Always check GraphQL field resolvers on entities for overlapping SQL queries and use request-scoped caching in `context` to deduplicate concurrent field resolutions.
