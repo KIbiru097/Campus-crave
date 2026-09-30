@@ -202,7 +202,8 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // Bolt: Pass a request-scoped cache Map to deduplicate database queries during a single GraphQL execution
+                return { user, cache: new Map() };
             },
         })
     );
