@@ -99,6 +99,119 @@ const checkUserOwnsCafe = async (userId, cafeId) => {
     return result.rows.length > 0;
 };
 
+// ==================== CUSTOM REQUEST-SCOPED BATCH LOADERS ====================
+// Lightweight DataLoader implementation to solve N+1 queries without external dependencies.
+function createBatchLoader(batchFn) {
+    let queue = [];
+    let scheduled = false;
+
+    return (key) => {
+        return new Promise((resolve, reject) => {
+            queue.push({ key, resolve, reject });
+
+            if (!scheduled) {
+                scheduled = true;
+                Promise.resolve().then(async () => {
+                    const currentQueue = queue;
+                    queue = [];
+                    scheduled = false;
+
+                    const keys = currentQueue.map((item) => item.key);
+                    try {
+                        const resultsMap = await batchFn(keys);
+                        for (const item of currentQueue) {
+                            item.resolve(resultsMap.get(item.key));
+                        }
+                    } catch (err) {
+                        for (const item of currentQueue) {
+                            item.reject(err);
+                        }
+                    }
+                });
+            }
+        });
+    };
+}
+
+// Factory to create fresh loaders per request context
+function createLoaders() {
+    return {
+        // Cafe loader: Batch load cafes by ID
+        cafeLoader: createBatchLoader(async (ids) => {
+            const uniqueIds = Array.from(new Set(ids));
+            if (uniqueIds.length === 0) return new Map();
+            const res = await pool.query(
+                'SELECT * FROM cafes WHERE id = ANY($1) AND deleted_at IS NULL',
+                [uniqueIds]
+            );
+            const map = new Map();
+            res.rows.forEach((row) => map.set(row.id, row));
+            return map;
+        }),
+
+        // Student loader: Batch load students with joined user info by student ID
+        studentLoader: createBatchLoader(async (ids) => {
+            const uniqueIds = Array.from(new Set(ids));
+            if (uniqueIds.length === 0) return new Map();
+            const res = await pool.query(
+                `SELECT s.*, u.username, u.email
+                 FROM students s
+                 JOIN users u ON s.user_id = u.id
+                 WHERE s.id = ANY($1) AND u.deleted_at IS NULL`,
+                [uniqueIds]
+            );
+            const map = new Map();
+            res.rows.forEach((row) => map.set(row.id, row));
+            return map;
+        }),
+
+        // Order Items loader: Batch load order items grouped by order_id
+        orderItemsLoader: createBatchLoader(async (orderIds) => {
+            const uniqueIds = Array.from(new Set(orderIds));
+            if (uniqueIds.length === 0) return new Map();
+            const res = await pool.query(
+                `SELECT oi.*, mi.name, mi.price as current_price, mi.category
+                 FROM order_items oi
+                 JOIN menu_items mi ON oi.menu_item_id = mi.id
+                 WHERE oi.order_id = ANY($1) AND mi.deleted_at IS NULL`,
+                [uniqueIds]
+            );
+            const map = new Map();
+            res.rows.forEach((row) => {
+                if (!map.has(row.order_id)) map.set(row.order_id, []);
+                map.get(row.order_id).push(row);
+            });
+            return map;
+        }),
+
+        // Payment loader: Batch load payments by order_id
+        paymentLoader: createBatchLoader(async (orderIds) => {
+            const uniqueIds = Array.from(new Set(orderIds));
+            if (uniqueIds.length === 0) return new Map();
+            const res = await pool.query(
+                'SELECT * FROM payments WHERE order_id = ANY($1)',
+                [uniqueIds]
+            );
+            const map = new Map();
+            res.rows.forEach((row) => map.set(row.order_id, row));
+            return map;
+        }),
+
+        // Delivery loader: Batch load deliveries by order_id
+        deliveryLoader: createBatchLoader(async (orderIds) => {
+            const uniqueIds = Array.from(new Set(orderIds));
+            if (uniqueIds.length === 0) return new Map();
+            const res = await pool.query(
+                'SELECT * FROM deliveries WHERE order_id = ANY($1)',
+                [uniqueIds]
+            );
+            const map = new Map();
+            res.rows.forEach((row) => map.set(row.order_id, row));
+            return map;
+        }),
+    };
+}
+
 const resolvers = {
     // ============== QUERY RESOLVERS ==============
     
@@ -943,16 +1056,22 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        cafe: async (order, _, context) => {
             try {
+                if (context?.loaders?.cafeLoader) {
+                    return (await context.loaders.cafeLoader(order.cafe_id)) || null;
+                }
                 const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
                 return result.rows[0];
             } catch (error) {
                 return null;
             }
         },
-        student: async (order) => {
+        student: async (order, _, context) => {
             try {
+                if (context?.loaders?.studentLoader) {
+                    return (await context.loaders.studentLoader(order.student_id)) || null;
+                }
                 const result = await pool.query(
                     `SELECT s.*, u.username, u.email
                      FROM students s
@@ -965,8 +1084,11 @@ const resolvers = {
                 return null;
             }
         },
-        items: async (order) => {
+        items: async (order, _, context) => {
             try {
+                if (context?.loaders?.orderItemsLoader) {
+                    return (await context.loaders.orderItemsLoader(order.id)) || [];
+                }
                 const result = await pool.query(
                     `SELECT oi.*, mi.name, mi.price as current_price, mi.category
                      FROM order_items oi
@@ -979,16 +1101,22 @@ const resolvers = {
                 return [];
             }
         },
-        payment: async (order) => {
+        payment: async (order, _, context) => {
             try {
+                if (context?.loaders?.paymentLoader) {
+                    return (await context.loaders.paymentLoader(order.id)) || null;
+                }
                 const result = await pool.query('SELECT * FROM payments WHERE order_id = $1', [order.id]);
                 return result.rows[0];
             } catch (error) {
                 return null;
             }
         },
-        delivery: async (order) => {
+        delivery: async (order, _, context) => {
             try {
+                if (context?.loaders?.deliveryLoader) {
+                    return (await context.loaders.deliveryLoader(order.id)) || null;
+                }
                 const result = await pool.query('SELECT * FROM deliveries WHERE order_id = $1', [order.id]);
                 return result.rows[0];
             } catch (error) {
@@ -2021,4 +2149,4 @@ const resolvers = {
     }
 };
 
-module.exports = { resolvers, getUserFromToken };
+module.exports = { resolvers, getUserFromToken, createLoaders };
