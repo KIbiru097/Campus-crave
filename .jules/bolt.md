@@ -1,0 +1,3 @@
+## 2026-10-04 - Request-scoped promise caching for GraphQL field resolvers
+**Learning:** GraphQL field resolvers for aggregated statistics on child fields (such as `average_rating` and `review_count`) execute separate SQL queries by default. Using a request-scoped `Map` in Apollo context to cache and share the database Promise between field resolvers on the same entity reduces database roundtrips by 50% for those metrics per request without requiring external caching layers like Redis.
+**Action:** Always check if adjacent field resolvers on GraphQL entities query the same table/data, and combine queries with a request-scoped promise cache.
