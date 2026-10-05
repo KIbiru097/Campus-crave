@@ -1,0 +1,3 @@
+## 2026-10-05 - Request-Scoped GraphQL Field Resolver Promise Caching
+**Learning:** GraphQL field resolvers that perform database lookups (such as `Order.cafe`, `Order.student`, `Cafe.average_rating`, `Cafe.review_count`) run N times when querying lists. Caching promises directly in a short-lived request-scoped `Map` in Apollo context deduplicates concurrent and repeated SQL calls across nested resolvers without adding external dependencies.
+**Action:** When optimizing N+1 field resolvers in GraphQL servers where DataLoader isn't configured, instantiate a request-scoped `Map` in context and cache in-flight query promises by unique entity key.
