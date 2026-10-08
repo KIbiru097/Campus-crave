@@ -1,0 +1,3 @@
+## 2026-10-07 - Request-Scoped Caching for GraphQL Resolvers
+**Learning:** In GraphQL APIs built with Apollo Server and Postgres (`pg`), field resolvers run independently for every item in list responses, creating N+1 query patterns. Passing a request-scoped `cache = new Map()` via Apollo context and deduplicating queries across field resolvers (`Cafe`, `MenuItem`, `Order`, `Review`, `Delivery`) eliminates redundant DB queries within a single GraphQL execution without risk of stale cross-request data.
+**Action:** Always instantiate `context.cache` in Apollo context middleware or lazily initialize it inside a request-scoped helper `getCached(context, key, fetcher)` to ensure zero-overhead query deduplication across all resolvers.
