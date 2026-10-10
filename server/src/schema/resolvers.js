@@ -99,6 +99,57 @@ const checkUserOwnsCafe = async (userId, cafeId) => {
     return result.rows.length > 0;
 };
 
+// Request-scoped cache helpers to optimize GraphQL field resolvers and eliminate N+1/redundant queries
+const getCafeReviewStats = (cafeId, context) => {
+    if (!context) {
+        return pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+            [cafeId]
+        ).then(res => res.rows[0]);
+    }
+    if (!context.cafeReviewStatsCache) context.cafeReviewStatsCache = new Map();
+    if (!context.cafeReviewStatsCache.has(cafeId)) {
+        const promise = pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+            [cafeId]
+        ).then(res => res.rows[0] || { avg_rating: null, count: 0 });
+        context.cafeReviewStatsCache.set(cafeId, promise);
+    }
+    return context.cafeReviewStatsCache.get(cafeId);
+};
+
+const getMenuItemReviewStats = (menuItemId, context) => {
+    if (!context) {
+        return pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+            [menuItemId]
+        ).then(res => res.rows[0]);
+    }
+    if (!context.menuItemReviewStatsCache) context.menuItemReviewStatsCache = new Map();
+    if (!context.menuItemReviewStatsCache.has(menuItemId)) {
+        const promise = pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+            [menuItemId]
+        ).then(res => res.rows[0] || { avg_rating: null, count: 0 });
+        context.menuItemReviewStatsCache.set(menuItemId, promise);
+    }
+    return context.menuItemReviewStatsCache.get(menuItemId);
+};
+
+const getCafeById = (cafeId, context) => {
+    if (!context) {
+        return pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [cafeId])
+            .then(res => res.rows[0]);
+    }
+    if (!context.cafeCache) context.cafeCache = new Map();
+    if (!context.cafeCache.has(cafeId)) {
+        const promise = pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [cafeId])
+            .then(res => res.rows[0] || null);
+        context.cafeCache.set(cafeId, promise);
+    }
+    return context.cafeCache.get(cafeId);
+};
+
 const resolvers = {
     // ============== QUERY RESOLVERS ==============
     
@@ -872,24 +923,19 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        // ⚡ OPTIMIZATION: Request-scoped query caching avoids redundant review queries per request
+        average_rating: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const stats = await getCafeReviewStats(cafe.id, context);
+                return stats?.avg_rating ? parseFloat(parseFloat(stats.avg_rating).toFixed(1)) : null;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        review_count: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const stats = await getCafeReviewStats(cafe.id, context);
+                return parseInt(stats?.count) || 0;
             } catch (error) {
                 return 0;
             }
@@ -897,24 +943,19 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        // ⚡ OPTIMIZATION: Request-scoped query caching combines rating & review_count into a single query per item
+        average_rating: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const stats = await getMenuItemReviewStats(menuItem.id, context);
+                return stats?.avg_rating ? parseFloat(parseFloat(stats.avg_rating).toFixed(1)) : null;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        review_count: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const stats = await getMenuItemReviewStats(menuItem.id, context);
+                return parseInt(stats?.count) || 0;
             } catch (error) {
                 return 0;
             }
@@ -943,10 +984,10 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        // ⚡ OPTIMIZATION: Request-scoped query caching deduplicates cafe queries across lists of orders (N+1 optimization)
+        cafe: async (order, _, context) => {
             try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
+                return await getCafeById(order.cafe_id, context);
             } catch (error) {
                 return null;
             }
