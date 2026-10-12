@@ -638,63 +638,69 @@ const resolvers = {
             if (!user || user.role !== 'admin') throw new Error('Not authorized');
             
             try {
-                const revenueResult = await pool.query(
-                    `SELECT COALESCE(SUM(total_amount), 0) as total_revenue,
-                            COUNT(*) as total_orders,
-                            COALESCE(AVG(total_amount), 0) as avg_order_value
-                     FROM orders WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '1 day' * $1`,
-                    [days]
-                );
-                
-                const dailyRevenue = await pool.query(
-                    `SELECT DATE(created_at) as date,
-                            SUM(total_amount) as revenue,
-                            COUNT(*) as order_count
-                     FROM orders WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '1 day' * $1
-                     GROUP BY DATE(created_at) ORDER BY date DESC`,
-                    [days]
-                );
-                
-                const topSelling = await pool.query(
-                    `SELECT mi.name, c.name as cafe_name, SUM(oi.quantity) as total_quantity,
-                            SUM(oi.subtotal) as total_revenue
-                     FROM order_items oi
-                     JOIN menu_items mi ON oi.menu_item_id = mi.id
-                     JOIN orders o ON oi.order_id = o.id
-                     JOIN cafes c ON o.cafe_id = c.id
-                     WHERE o.deleted_at IS NULL AND o.created_at > NOW() - INTERVAL '1 day' * $1
-                     GROUP BY mi.name, c.name
-                     ORDER BY total_quantity DESC LIMIT 10`,
-                    [days]
-                );
-                
-                const cafePerf = await pool.query(
-                    `SELECT c.name as cafe_name, COUNT(*) as order_count,
-                            SUM(o.total_amount) as revenue,
-                            AVG(EXTRACT(EPOCH FROM (d.delivered_time - o.created_at))/60) as avg_delivery_time
-                     FROM orders o
-                     JOIN cafes c ON o.cafe_id = c.id
-                     LEFT JOIN deliveries d ON d.order_id = o.id
-                     WHERE o.deleted_at IS NULL AND o.created_at > NOW() - INTERVAL '1 day' * $1
-                     GROUP BY c.name ORDER BY revenue DESC`,
-                    [days]
-                );
-                
-                const orderTrend = await pool.query(
-                    `SELECT DATE(created_at) as date, COUNT(*) as count
-                     FROM orders WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '1 day' * $1
-                     GROUP BY DATE(created_at) ORDER BY date DESC`,
-                    [days]
-                );
-                
-                const avgDeliveryTime = await pool.query(
-                    `SELECT AVG(EXTRACT(EPOCH FROM (delivered_time - o.created_at))/60) as avg_minutes
-                     FROM deliveries d
-                     JOIN orders o ON d.order_id = o.id
-                     WHERE d.delivered_time IS NOT NULL
-                     AND d.created_at > NOW() - INTERVAL '1 day' * $1`,
-                    [days]
-                );
+                // ⚡ Bolt Optimization: Execute all analytics database queries concurrently
+                // with Promise.all to avoid 6 sequential roundtrips over the connection pool.
+                const [
+                    revenueResult,
+                    dailyRevenue,
+                    topSelling,
+                    cafePerf,
+                    orderTrend,
+                    avgDeliveryTime
+                ] = await Promise.all([
+                    pool.query(
+                        `SELECT COALESCE(SUM(total_amount), 0) as total_revenue,
+                                COUNT(*) as total_orders,
+                                COALESCE(AVG(total_amount), 0) as avg_order_value
+                         FROM orders WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '1 day' * $1`,
+                        [days]
+                    ),
+                    pool.query(
+                        `SELECT DATE(created_at) as date,
+                                SUM(total_amount) as revenue,
+                                COUNT(*) as order_count
+                         FROM orders WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '1 day' * $1
+                         GROUP BY DATE(created_at) ORDER BY date DESC`,
+                        [days]
+                    ),
+                    pool.query(
+                        `SELECT mi.name, c.name as cafe_name, SUM(oi.quantity) as total_quantity,
+                                SUM(oi.subtotal) as total_revenue
+                         FROM order_items oi
+                         JOIN menu_items mi ON oi.menu_item_id = mi.id
+                         JOIN orders o ON oi.order_id = o.id
+                         JOIN cafes c ON o.cafe_id = c.id
+                         WHERE o.deleted_at IS NULL AND o.created_at > NOW() - INTERVAL '1 day' * $1
+                         GROUP BY mi.name, c.name
+                         ORDER BY total_quantity DESC LIMIT 10`,
+                        [days]
+                    ),
+                    pool.query(
+                        `SELECT c.name as cafe_name, COUNT(*) as order_count,
+                                SUM(o.total_amount) as revenue,
+                                AVG(EXTRACT(EPOCH FROM (d.delivered_time - o.created_at))/60) as avg_delivery_time
+                         FROM orders o
+                         JOIN cafes c ON o.cafe_id = c.id
+                         LEFT JOIN deliveries d ON d.order_id = o.id
+                         WHERE o.deleted_at IS NULL AND o.created_at > NOW() - INTERVAL '1 day' * $1
+                         GROUP BY c.name ORDER BY revenue DESC`,
+                        [days]
+                    ),
+                    pool.query(
+                        `SELECT DATE(created_at) as date, COUNT(*) as count
+                         FROM orders WHERE deleted_at IS NULL AND created_at > NOW() - INTERVAL '1 day' * $1
+                         GROUP BY DATE(created_at) ORDER BY date DESC`,
+                        [days]
+                    ),
+                    pool.query(
+                        `SELECT AVG(EXTRACT(EPOCH FROM (delivered_time - o.created_at))/60) as avg_minutes
+                         FROM deliveries d
+                         JOIN orders o ON d.order_id = o.id
+                         WHERE d.delivered_time IS NOT NULL
+                         AND d.created_at > NOW() - INTERVAL '1 day' * $1`,
+                        [days]
+                    )
+                ]);
                 
                 const rv = revenueResult.rows[0];
                 return {
@@ -944,6 +950,16 @@ const resolvers = {
     
     Order: {
         cafe: async (order) => {
+            // ⚡ Bolt Optimization: Reuse already JOINed cafe details from order queries
+            // (e.g. myOrders, order, cafeOrders) to eliminate N+1 SQL queries per order list item.
+            if (order.cafe) return order.cafe;
+            if (order.cafe_name) {
+                return {
+                    id: order.cafe_id,
+                    name: order.cafe_name,
+                    location: order.cafe_location
+                };
+            }
             try {
                 const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
                 return result.rows[0];
