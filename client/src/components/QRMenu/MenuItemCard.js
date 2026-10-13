@@ -1,16 +1,21 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 
 const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
 
-export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
+/**
+ * ⚡ Performance Optimization:
+ * Wrapped in React.memo to prevent re-rendering all menu cards on every cart quantity
+ * or favorite status update. Accepts a primitive `isFav` boolean prop instead of reference-based Set.
+ */
+function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, isFav: isFavProp, favorites, onToggleFav }) {
   const ref = useRef(null);
   const [justAdded, setJustAdded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const size = SIZES[index % SIZES.length];
   const hasDiscount = item.originalPrice && item.originalPrice > item.price;
-  const isFav = favorites && favorites.has(item.id);
+  const isFav = isFavProp !== undefined ? isFavProp : (favorites && favorites.has(item.id));
 
   const handleMouseMove = useCallback((e) => {
     if (!ref.current) return;
@@ -149,3 +154,5 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
     </motion.div>
   );
 }
+
+export default memo(MenuItemCard);
