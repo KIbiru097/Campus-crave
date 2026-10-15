@@ -1,0 +1,3 @@
+## 2026-10-15 - Request-scoped caching in GraphQL resolvers
+**Learning:** In GraphQL schemas with related field resolvers (such as `average_rating` and `review_count` on `Cafe` or `MenuItem`), querying the database separately in each resolver leads to redundant database roundtrips for every item in a list query. Attaching a request-scoped promise cache map to the Apollo GraphQL context allows concurrent field resolvers on the same entity to share a single DB query result per request without full DataDataLoader overhead or global caching stale data issues.
+**Action:** When adding multiple field resolvers that fetch aggregate data from the same table/entity, implement a request-scoped cache in context to deduplicate queries.
