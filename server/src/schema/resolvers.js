@@ -99,6 +99,62 @@ const checkUserOwnsCafe = async (userId, cafeId) => {
     return result.rows.length > 0;
 };
 
+// ⚡ Bolt: Helper function for request-scoped deduplication of Cafe review statistics.
+// Expected Impact: Deduplicates concurrent average_rating and review_count queries for the same cafe ID,
+// reducing SQL database queries by 50% during GraphQL field resolution.
+async function getCafeReviewStats(cafeId, context) {
+    if (context?.cafeReviewStatsCache?.has(cafeId)) {
+        return context.cafeReviewStatsCache.get(cafeId);
+    }
+    const promise = (async () => {
+        try {
+            const result = await pool.query(
+                'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+                [cafeId]
+            );
+            const row = result.rows[0];
+            return {
+                avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                count: parseInt(row?.count) || 0
+            };
+        } catch (error) {
+            return { avg_rating: null, count: 0 };
+        }
+    })();
+    if (context?.cafeReviewStatsCache) {
+        context.cafeReviewStatsCache.set(cafeId, promise);
+    }
+    return promise;
+}
+
+// ⚡ Bolt: Helper function for request-scoped deduplication of MenuItem review statistics.
+// Expected Impact: Combines AVG rating and COUNT queries into 1 query and caches the promise per GraphQL request context,
+// reducing database roundtrips by 50% when both average_rating and review_count are requested.
+async function getMenuItemReviewStats(menuItemId, context) {
+    if (context?.menuItemReviewStatsCache?.has(menuItemId)) {
+        return context.menuItemReviewStatsCache.get(menuItemId);
+    }
+    const promise = (async () => {
+        try {
+            const result = await pool.query(
+                'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+                [menuItemId]
+            );
+            const row = result.rows[0];
+            return {
+                avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+                count: parseInt(row?.count) || 0
+            };
+        } catch (error) {
+            return { avg_rating: null, count: 0 };
+        }
+    })();
+    if (context?.menuItemReviewStatsCache) {
+        context.menuItemReviewStatsCache.set(menuItemId, promise);
+    }
+    return promise;
+}
+
 const resolvers = {
     // ============== QUERY RESOLVERS ==============
     
@@ -872,52 +928,26 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
-            try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
-            } catch (error) {
-                return null;
-            }
+        // ⚡ Bolt: Deduplicated via request-scoped cache (reduces DB queries by 50% when average_rating and review_count are both requested)
+        average_rating: async (cafe, _, context) => {
+            const stats = await getCafeReviewStats(cafe.id, context);
+            return stats.avg_rating;
         },
-        review_count: async (cafe) => {
-            try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
-            } catch (error) {
-                return 0;
-            }
+        review_count: async (cafe, _, context) => {
+            const stats = await getCafeReviewStats(cafe.id, context);
+            return stats.count;
         },
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
-            try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
-            } catch (error) {
-                return null;
-            }
+        // ⚡ Bolt: Deduplicated via request-scoped cache (combines AVG and COUNT query and caches promise per GraphQL request)
+        average_rating: async (menuItem, _, context) => {
+            const stats = await getMenuItemReviewStats(menuItem.id, context);
+            return stats.avg_rating;
         },
-        review_count: async (menuItem) => {
-            try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
-            } catch (error) {
-                return 0;
-            }
+        review_count: async (menuItem, _, context) => {
+            const stats = await getMenuItemReviewStats(menuItem.id, context);
+            return stats.count;
         },
     },
     
