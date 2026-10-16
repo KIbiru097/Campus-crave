@@ -202,7 +202,12 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // ⚡ Bolt: Request-scoped cache maps for field resolver query deduplication
+                return {
+                    user,
+                    cafeReviewStatsCache: new Map(),
+                    menuItemReviewStatsCache: new Map()
+                };
             },
         })
     );
