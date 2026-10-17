@@ -5,6 +5,7 @@ const { expressMiddleware } = require('@apollo/server/express4');
 const cors = require('cors');
 const typeDefs = require('./schema/typeDefs');
 const { resolvers, getUserFromToken } = require('./schema/resolvers');
+const { createLoaders } = require('./utils/loaders');
 const MockPaymentService = require('./services/mockPaymentService');
 
 const app = express();
@@ -202,7 +203,9 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // Instantiate fresh request-scoped batch loaders to eliminate N+1 queries
+                const loaders = createLoaders();
+                return { user, loaders };
             },
         })
     );
