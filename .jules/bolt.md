@@ -1,0 +1,3 @@
+## 2026-07-21 - Request-Scoped Batch Loaders for GraphQL N+1 Prevention
+**Learning:** GraphQL field resolvers that perform database queries per entity (e.g. `Order.cafe`, `Order.student`, `Order.items`, `MenuItem.average_rating`) cause severe N+1 database roundtrips when fetching lists. Lightweight batching using `process.nextTick` aggregates entity IDs within the event loop tick into a single PostgreSQL `WHERE id = ANY($1)` or `GROUP BY` query without needing external dependencies.
+**Action:** Always instantiate request-scoped batch loaders in Apollo Server context (`context.loaders`) for nested relations to eliminate N+1 query bottlenecks across all list queries.
