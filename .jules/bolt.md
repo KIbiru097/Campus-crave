@@ -1,0 +1,3 @@
+## 2026-07-21 - Request-Scoped Caching for GraphQL Review Aggregates
+**Learning:** In GraphQL schemas with separate field resolvers for aggregates (e.g., `average_rating` and `review_count`), separate database queries are executed for each field per object. Instantiating a short-lived `Map` in the Apollo context allows field resolvers to batch `AVG` and `COUNT` into a single SQL query and share the in-flight promise across concurrent field resolutions within the request.
+**Action:** When adding or optimizing aggregate field resolvers in GraphQL, instantiate a `Map` on Apollo context and cache the query promise keyed by entity ID.
