@@ -1,0 +1,3 @@
+## 2026-10-19 - Deduplicating GraphQL Field Resolvers via Request-Scoped Caching
+**Learning:** In GraphQL schemas with separate field resolvers for calculated fields on the same entity (e.g. `average_rating` and `review_count`), each field triggers an independent database round-trip for every returned item unless cached. Storing a pending Promise in a request-scoped `Map` on `context` deduplicates these operations into a single DB query per entity per request.
+**Action:** Always check if multiple GraphQL field resolvers query the same underlying table/entity, and use request-scoped caching on `context` to batch or deduplicate database operations.
