@@ -1,16 +1,19 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 
 const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
 
-export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
+// ⚡ Bolt Performance Optimization:
+// MenuItemCard is memoized with React.memo to prevent re-rendering every item card
+// when parent state (cart, search query, favorites Set) updates on QRMenuPage.
+// Re-renders are skipped for cards whose props (item, cartQty, isFav, callbacks) remain unchanged.
+function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, isFav, onToggleFav }) {
   const ref = useRef(null);
   const [justAdded, setJustAdded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const size = SIZES[index % SIZES.length];
   const hasDiscount = item.originalPrice && item.originalPrice > item.price;
-  const isFav = favorites && favorites.has(item.id);
 
   const handleMouseMove = useCallback((e) => {
     if (!ref.current) return;
@@ -149,3 +152,5 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
     </motion.div>
   );
 }
+
+export default memo(MenuItemCard);
