@@ -3,9 +3,14 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/database');
 
-// PubSub for subscriptions
-const { PubSub } = require('graphql-subscriptions');
-const pubsub = new PubSub();
+// PubSub for subscriptions (with fallback if module isn't installed)
+let pubsub;
+try {
+    const { PubSub } = require('graphql-subscriptions');
+    pubsub = new PubSub();
+} catch (e) {
+    pubsub = { publish: () => {} };
+}
 
 // Subscription event names
 const EVENTS = {
@@ -38,7 +43,7 @@ setInterval(() => {
     for (const [ip, entry] of rateLimitStore) {
         if (now - entry.windowStart > RATE_LIMIT_WINDOW * 2) rateLimitStore.delete(ip);
     }
-}, 60000);
+}, 60000).unref();
 
 // Audit logging helper
 async function logAudit(userId, action, entityType, entityId, details, ipAddress) {
@@ -97,6 +102,52 @@ const checkUserOwnsCafe = async (userId, cafeId) => {
         [userId, cafeId]
     );
     return result.rows.length > 0;
+};
+
+// Helper for request-scoped caching and query deduplication
+const getCached = (context, key, fetchFn) => {
+    if (context) {
+        if (!context.cache) {
+            context.cache = new Map();
+        }
+        if (context.cache.has(key)) {
+            return context.cache.get(key);
+        }
+        const promise = fetchFn();
+        context.cache.set(key, promise);
+        return promise;
+    }
+    return fetchFn();
+};
+
+// Helper to fetch combined review stats for a cafe in a single database call
+const getCafeReviewStats = (cafeId, context) => {
+    return getCached(context, `cafe_stats_${cafeId}`, async () => {
+        const result = await pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+            [cafeId]
+        );
+        const row = result.rows[0];
+        return {
+            avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+            count: parseInt(row?.count) || 0
+        };
+    });
+};
+
+// Helper to fetch combined review stats for a menu item in a single database call
+const getMenuItemReviewStats = (menuItemId, context) => {
+    return getCached(context, `menu_item_stats_${menuItemId}`, async () => {
+        const result = await pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+            [menuItemId]
+        );
+        const row = result.rows[0];
+        return {
+            avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+            count: parseInt(row?.count) || 0
+        };
+    });
 };
 
 const resolvers = {
@@ -860,36 +911,35 @@ const resolvers = {
     
     // ============== FIELD RESOLVERS ==============
     
+    // Performance Optimization: Helper function for request-scoped caching and query deduplication.
+    // Uses a short-lived Map instantiated per-request in Apollo context to prevent N+1 queries.
     Cafe: {
-        menu_items: async (cafe) => {
+        menu_items: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT * FROM menu_items WHERE cafe_id = $1 AND deleted_at IS NULL AND status = $2 ORDER BY category, name',
-                    [cafe.id, 'Available']
-                );
-                return result.rows;
+                return getCached(context, `cafe_menu_items_${cafe.id}`, async () => {
+                    const result = await pool.query(
+                        'SELECT * FROM menu_items WHERE cafe_id = $1 AND deleted_at IS NULL AND status = $2 ORDER BY category, name',
+                        [cafe.id, 'Available']
+                    );
+                    return result.rows;
+                });
             } catch (error) {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
+        // Combines average_rating and review_count into a single database query per cafe
+        average_rating: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const stats = await getCafeReviewStats(cafe.id, context);
+                return stats.avg_rating;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (cafe) => {
+        review_count: async (cafe, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const stats = await getCafeReviewStats(cafe.id, context);
+                return stats.count;
             } catch (error) {
                 return 0;
             }
@@ -897,24 +947,19 @@ const resolvers = {
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
+        // Combines average_rating and review_count into a single database query per menu item
+        average_rating: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
+                const stats = await getMenuItemReviewStats(menuItem.id, context);
+                return stats.avg_rating;
             } catch (error) {
                 return null;
             }
         },
-        review_count: async (menuItem) => {
+        review_count: async (menuItem, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
+                const stats = await getMenuItemReviewStats(menuItem.id, context);
+                return stats.count;
             } catch (error) {
                 return 0;
             }
@@ -943,54 +988,64 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        cafe: async (order, _, context) => {
             try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
+                return getCached(context, `cafe_${order.cafe_id}`, async () => {
+                    const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
         },
-        student: async (order) => {
+        student: async (order, _, context) => {
             try {
-                const result = await pool.query(
-                    `SELECT s.*, u.username, u.email
-                     FROM students s
-                     JOIN users u ON s.user_id = u.id
-                     WHERE s.id = $1 AND u.deleted_at IS NULL`,
-                    [order.student_id]
-                );
-                return result.rows[0] || null;
+                return getCached(context, `student_${order.student_id}`, async () => {
+                    const result = await pool.query(
+                        `SELECT s.*, u.username, u.email
+                         FROM students s
+                         JOIN users u ON s.user_id = u.id
+                         WHERE s.id = $1 AND u.deleted_at IS NULL`,
+                        [order.student_id]
+                    );
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
         },
-        items: async (order) => {
+        items: async (order, _, context) => {
             try {
-                const result = await pool.query(
-                    `SELECT oi.*, mi.name, mi.price as current_price, mi.category
-                     FROM order_items oi
-                     JOIN menu_items mi ON oi.menu_item_id = mi.id
-                     WHERE oi.order_id = $1 AND mi.deleted_at IS NULL`,
-                    [order.id]
-                );
-                return result.rows;
+                return getCached(context, `order_items_${order.id}`, async () => {
+                    const result = await pool.query(
+                        `SELECT oi.*, mi.name, mi.price as current_price, mi.category
+                         FROM order_items oi
+                         JOIN menu_items mi ON oi.menu_item_id = mi.id
+                         WHERE oi.order_id = $1 AND mi.deleted_at IS NULL`,
+                        [order.id]
+                    );
+                    return result.rows;
+                });
             } catch (error) {
                 return [];
             }
         },
-        payment: async (order) => {
+        payment: async (order, _, context) => {
             try {
-                const result = await pool.query('SELECT * FROM payments WHERE order_id = $1', [order.id]);
-                return result.rows[0];
+                return getCached(context, `payment_order_${order.id}`, async () => {
+                    const result = await pool.query('SELECT * FROM payments WHERE order_id = $1', [order.id]);
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
         },
-        delivery: async (order) => {
+        delivery: async (order, _, context) => {
             try {
-                const result = await pool.query('SELECT * FROM deliveries WHERE order_id = $1', [order.id]);
-                return result.rows[0];
+                return getCached(context, `delivery_order_${order.id}`, async () => {
+                    const result = await pool.query('SELECT * FROM deliveries WHERE order_id = $1', [order.id]);
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
@@ -998,38 +1053,45 @@ const resolvers = {
     },
 
     Delivery: {
-        order: async (delivery) => {
+        order: async (delivery, _, context) => {
             try {
-                const result = await pool.query(
-                    `SELECT o.*, c.name as cafe_name, c.location as cafe_location
-                     FROM orders o
-                     JOIN cafes c ON o.cafe_id = c.id
-                     WHERE o.id = $1 AND o.deleted_at IS NULL`,
-                    [delivery.order_id]
-                );
-                return result.rows[0] || null;
+                return getCached(context, `order_${delivery.order_id}`, async () => {
+                    const result = await pool.query(
+                        `SELECT o.*, c.name as cafe_name, c.location as cafe_location
+                         FROM orders o
+                         JOIN cafes c ON o.cafe_id = c.id
+                         WHERE o.id = $1 AND o.deleted_at IS NULL`,
+                        [delivery.order_id]
+                    );
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
         },
-        delivery_person: async (delivery) => {
+        delivery_person: async (delivery, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT id, username, email, phone, role FROM users WHERE id = $1',
-                    [delivery.delivery_person_id]
-                );
-                return result.rows[0] || null;
+                return getCached(context, `user_${delivery.delivery_person_id}`, async () => {
+                    const result = await pool.query(
+                        'SELECT id, username, email, phone, role FROM users WHERE id = $1',
+                        [delivery.delivery_person_id]
+                    );
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
         },
-        assigner: async (delivery) => {
+        assigner: async (delivery, _, context) => {
             try {
-                const result = await pool.query(
-                    'SELECT id, username, email, phone, role FROM users WHERE id = $1',
-                    [delivery.assigned_by]
-                );
-                return result.rows[0] || null;
+                if (!delivery.assigned_by) return null;
+                return getCached(context, `user_${delivery.assigned_by}`, async () => {
+                    const result = await pool.query(
+                        'SELECT id, username, email, phone, role FROM users WHERE id = $1',
+                        [delivery.assigned_by]
+                    );
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
@@ -1037,14 +1099,16 @@ const resolvers = {
     },
 
     AuditLog: {
-        user: async (log) => {
+        user: async (log, _, context) => {
             try {
                 if (!log.user_id) return null;
-                const result = await pool.query(
-                    'SELECT id, username, email, role FROM users WHERE id = $1',
-                    [log.user_id]
-                );
-                return result.rows[0] || null;
+                return getCached(context, `user_${log.user_id}`, async () => {
+                    const result = await pool.query(
+                        'SELECT id, username, email, role FROM users WHERE id = $1',
+                        [log.user_id]
+                    );
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
@@ -1052,32 +1116,38 @@ const resolvers = {
     },
 
     Review: {
-        student: async (review) => {
+        student: async (review, _, context) => {
             try {
-                const result = await pool.query(
-                    `SELECT s.*, u.username, u.email FROM students s
-                     JOIN users u ON s.user_id = u.id WHERE s.id = $1`,
-                    [review.student_id]
-                );
-                return result.rows[0] || null;
+                return getCached(context, `student_${review.student_id}`, async () => {
+                    const result = await pool.query(
+                        `SELECT s.*, u.username, u.email FROM students s
+                         JOIN users u ON s.user_id = u.id WHERE s.id = $1`,
+                        [review.student_id]
+                    );
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
         },
-        cafe: async (review) => {
+        cafe: async (review, _, context) => {
             if (!review.cafe_id) return null;
             try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1', [review.cafe_id]);
-                return result.rows[0] || null;
+                return getCached(context, `cafe_${review.cafe_id}`, async () => {
+                    const result = await pool.query('SELECT * FROM cafes WHERE id = $1', [review.cafe_id]);
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
         },
-        menu_item: async (review) => {
+        menu_item: async (review, _, context) => {
             if (!review.menu_item_id) return null;
             try {
-                const result = await pool.query('SELECT * FROM menu_items WHERE id = $1', [review.menu_item_id]);
-                return result.rows[0] || null;
+                return getCached(context, `menu_item_${review.menu_item_id}`, async () => {
+                    const result = await pool.query('SELECT * FROM menu_items WHERE id = $1', [review.menu_item_id]);
+                    return result.rows[0] || null;
+                });
             } catch (error) {
                 return null;
             }
@@ -2021,4 +2091,4 @@ const resolvers = {
     }
 };
 
-module.exports = { resolvers, getUserFromToken };
+module.exports = { resolvers, getUserFromToken, getCached };

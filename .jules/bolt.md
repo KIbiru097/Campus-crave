@@ -1,0 +1,3 @@
+## 2026-03-31 - Request-Scoped GraphQL Resolver Cache
+**Learning:** GraphQL field resolvers on the same type (like `average_rating` and `review_count` on `Cafe` and `MenuItem`) execute as separate resolver calls during query resolution, causing duplicate database queries unless deduplicated. Lazily initializing a request-scoped `Map` on `context` enables concurrent field resolvers to share the same pending database Promise, reducing query volume per request without cross-request cache leaks.
+**Action:** Use a request-scoped `getCached(context, key, fetchFn)` helper in GraphQL resolvers to deduplicate concurrent field resolver queries and combine aggregate stats (`AVG` + `COUNT`) into single database calls.
