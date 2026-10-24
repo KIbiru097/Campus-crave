@@ -740,15 +740,22 @@ const resolvers = {
                     if (studentResult.rows.length > 0) studentId = studentResult.rows[0].id;
                 }
                 
+                // Bolt performance optimization: Replaced N+1 correlated scalar subqueries with LEFT JOIN aggregated subqueries.
+                // This converts O(N*M) subquery evaluation per candidate menu item into a single batch aggregation pass.
                 let items;
                 if (studentId) {
                     items = await pool.query(
                         `SELECT mi.*, c.name as cafe_name,
-                                (SELECT COUNT(*) FROM order_items oi2
-                                 JOIN orders o2 ON oi2.order_id = o2.id
-                                 WHERE o2.student_id = $2 AND oi2.menu_item_id = mi.id) as order_count
+                                COALESCE(s_orders.order_count, 0) as order_count
                          FROM menu_items mi
                          JOIN cafes c ON mi.cafe_id = c.id
+                         LEFT JOIN (
+                             SELECT oi2.menu_item_id, COUNT(*) as order_count
+                             FROM order_items oi2
+                             JOIN orders o2 ON oi2.order_id = o2.id
+                             WHERE o2.student_id = $2
+                             GROUP BY oi2.menu_item_id
+                         ) s_orders ON mi.id = s_orders.menu_item_id
                          WHERE mi.deleted_at IS NULL AND mi.status = 'Available'
                          ${cafe_id ? 'AND mi.cafe_id = $3' : ''}
                          ORDER BY order_count DESC, RANDOM()
@@ -758,9 +765,14 @@ const resolvers = {
                 } else {
                     items = await pool.query(
                         `SELECT mi.*, c.name as cafe_name,
-                                (SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.menu_item_id = mi.id) as order_count
+                                COALESCE(pop.order_count, 0) as order_count
                          FROM menu_items mi
                          JOIN cafes c ON mi.cafe_id = c.id
+                         LEFT JOIN (
+                             SELECT oi.menu_item_id, SUM(oi.quantity) as order_count
+                             FROM order_items oi
+                             GROUP BY oi.menu_item_id
+                         ) pop ON mi.id = pop.menu_item_id
                          WHERE mi.deleted_at IS NULL AND mi.status = 'Available'
                          ${cafe_id ? 'AND mi.cafe_id = $2' : ''}
                          ORDER BY order_count DESC NULLS LAST, RANDOM()
@@ -777,8 +789,8 @@ const resolvers = {
                     category: item.category,
                     cafe_id: item.cafe_id,
                     cafe_name: item.cafe_name,
-                    score: item.order_count > 0 ? 1.0 - (idx * 0.1) : 0.5,
-                    reason: item.order_count > 0 ? 'Ordered before' : 'Popular item'
+                    score: Number(item.order_count) > 0 ? 1.0 - (idx * 0.1) : 0.5,
+                    reason: Number(item.order_count) > 0 ? 'Ordered before' : 'Popular item'
                 }));
             } catch (error) {
                 console.error('Recommendations error:', error);
