@@ -5,23 +5,36 @@ const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
 
 export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
   const ref = useRef(null);
+  const rafId = useRef(null);
   const [justAdded, setJustAdded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const size = SIZES[index % SIZES.length];
   const hasDiscount = item.originalPrice && item.originalPrice > item.price;
   const isFav = favorites && favorites.has(item.id);
 
+  // ⚡ Performance optimization: Update transform directly on DOM via requestAnimationFrame
+  // to avoid triggering React component re-renders (~100+ re-renders/sec) during cursor hover/mousemove.
   const handleMouseMove = useCallback((e) => {
     if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width - 0.5;
     const y = (e.clientY - rect.top) / rect.height - 0.5;
-    setTilt({ x: y * -5, y: x * 5 });
+    const tiltX = y * -5;
+    const tiltY = x * 5;
+
+    if (rafId.current) cancelAnimationFrame(rafId.current);
+    rafId.current = requestAnimationFrame(() => {
+      if (ref.current) {
+        ref.current.style.transform = `perspective(800px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+      }
+    });
   }, []);
 
   const handleMouseLeave = useCallback(() => {
-    setTilt({ x: 0, y: 0 });
+    if (rafId.current) cancelAnimationFrame(rafId.current);
+    if (ref.current) {
+      ref.current.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg)';
+    }
   }, []);
 
   const handleAdd = e => {
@@ -72,7 +85,6 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-40px' }}
       transition={{ delay: (index % 4) * 0.07, duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
-      style={{ transform: `perspective(800px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)` }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={e => { handleRipple(e); onDetail(item); }}
