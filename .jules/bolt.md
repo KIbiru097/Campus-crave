@@ -1,0 +1,3 @@
+## 2026-10-29 - GraphQL Field Resolver Query Duplication and Request Caching
+**Learning:** In GraphQL schemas, field resolvers like `average_rating` and `review_count` on `Cafe` or `MenuItem` often query the same DB table (`reviews`) separately for each item in a list result. Passing a request-scoped cache Map via Apollo context deduplicates database calls across sibling field resolvers and repeated entities within a single request, cutting DB query count by >50%.
+**Action:** Always instantiate request-scoped cache stores in Apollo GraphQL context and combine related aggregate field calculations (like `AVG` and `COUNT`) into a single cached request query.
