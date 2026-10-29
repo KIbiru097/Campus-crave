@@ -99,6 +99,82 @@ const checkUserOwnsCafe = async (userId, cafeId) => {
     return result.rows.length > 0;
 };
 
+/**
+ * ⚡ Performance Helper: Fetch and cache review statistics for a Cafe per request.
+ * Combines AVG(rating) and COUNT(*) into a single DB query and reuses cached result
+ * within the same GraphQL request context to prevent duplicate queries for average_rating and review_count.
+ */
+async function getCafeReviewStats(cafeId, context) {
+    const cacheMap = context?.cache?.cafeStats;
+    if (cacheMap && cacheMap.has(cafeId)) {
+        return cacheMap.get(cafeId);
+    }
+
+    try {
+        const result = await pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
+            [cafeId]
+        );
+        const row = result.rows[0];
+        const stats = {
+            avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+            count: parseInt(row?.count) || 0
+        };
+        if (cacheMap) cacheMap.set(cafeId, stats);
+        return stats;
+    } catch (error) {
+        return { avg_rating: null, count: 0 };
+    }
+}
+
+/**
+ * ⚡ Performance Helper: Fetch and cache review statistics for a MenuItem per request.
+ * Prevents N+1 database queries when rendering lists of menu items with ratings.
+ */
+async function getMenuItemReviewStats(menuItemId, context) {
+    const cacheMap = context?.cache?.menuItemStats;
+    if (cacheMap && cacheMap.has(menuItemId)) {
+        return cacheMap.get(menuItemId);
+    }
+
+    try {
+        const result = await pool.query(
+            'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
+            [menuItemId]
+        );
+        const row = result.rows[0];
+        const stats = {
+            avg_rating: row?.avg_rating ? parseFloat(parseFloat(row.avg_rating).toFixed(1)) : null,
+            count: parseInt(row?.count) || 0
+        };
+        if (cacheMap) cacheMap.set(menuItemId, stats);
+        return stats;
+    } catch (error) {
+        return { avg_rating: null, count: 0 };
+    }
+}
+
+/**
+ * ⚡ Performance Helper: Fetch and cache Cafe entity by ID per request.
+ * Deduplicates repeated cafe queries when fetching orders or menu items from the same cafe.
+ */
+async function getCafeById(cafeId, context) {
+    if (!cafeId) return null;
+    const cacheMap = context?.cache?.cafes;
+    if (cacheMap && cacheMap.has(cafeId)) {
+        return cacheMap.get(cafeId);
+    }
+
+    try {
+        const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [cafeId]);
+        const cafe = result.rows[0] || null;
+        if (cacheMap) cacheMap.set(cafeId, cafe);
+        return cafe;
+    } catch (error) {
+        return null;
+    }
+}
+
 const resolvers = {
     // ============== QUERY RESOLVERS ==============
     
@@ -872,52 +948,24 @@ const resolvers = {
                 return [];
             }
         },
-        average_rating: async (cafe) => {
-            try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating, COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
-            } catch (error) {
-                return null;
-            }
+        average_rating: async (cafe, _, context) => {
+            const stats = await getCafeReviewStats(cafe.id, context);
+            return stats.avg_rating;
         },
-        review_count: async (cafe) => {
-            try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE cafe_id = $1 AND deleted_at IS NULL',
-                    [cafe.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
-            } catch (error) {
-                return 0;
-            }
+        review_count: async (cafe, _, context) => {
+            const stats = await getCafeReviewStats(cafe.id, context);
+            return stats.count;
         },
     },
     
     MenuItem: {
-        average_rating: async (menuItem) => {
-            try {
-                const result = await pool.query(
-                    'SELECT AVG(rating) as avg_rating FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return result.rows[0]?.avg_rating ? parseFloat(parseFloat(result.rows[0].avg_rating).toFixed(1)) : null;
-            } catch (error) {
-                return null;
-            }
+        average_rating: async (menuItem, _, context) => {
+            const stats = await getMenuItemReviewStats(menuItem.id, context);
+            return stats.avg_rating;
         },
-        review_count: async (menuItem) => {
-            try {
-                const result = await pool.query(
-                    'SELECT COUNT(*) as count FROM reviews WHERE menu_item_id = $1 AND deleted_at IS NULL',
-                    [menuItem.id]
-                );
-                return parseInt(result.rows[0]?.count) || 0;
-            } catch (error) {
-                return 0;
-            }
+        review_count: async (menuItem, _, context) => {
+            const stats = await getMenuItemReviewStats(menuItem.id, context);
+            return stats.count;
         },
     },
     
@@ -943,13 +991,8 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
-            try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
-            } catch (error) {
-                return null;
-            }
+        cafe: async (order, _, context) => {
+            return await getCafeById(order.cafe_id, context);
         },
         student: async (order) => {
             try {

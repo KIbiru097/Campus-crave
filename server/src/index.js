@@ -202,7 +202,16 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                // ⚡ Bolt Optimization: Instantiate short-lived request-scoped caches
+                // to deduplicate N+1 database queries across field resolvers in a single request.
+                return {
+                    user,
+                    cache: {
+                        cafeStats: new Map(),
+                        menuItemStats: new Map(),
+                        cafes: new Map()
+                    }
+                };
             },
         })
     );
