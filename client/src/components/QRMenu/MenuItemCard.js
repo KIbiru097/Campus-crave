@@ -3,14 +3,17 @@ import { motion } from 'framer-motion';
 
 const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
 
-export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
+// ⚡ Bolt Optimization: Memoize MenuItemCard using React.memo to prevent unnecessary re-renders.
+// In the QR menu catalog, changing cart quantities or toggling a favorite previously caused
+// all menu items to re-render. With React.memo and primitive boolean isFav, only the affected card re-renders.
+function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, isFav: isFavProp, onToggleFav }) {
   const ref = useRef(null);
   const [justAdded, setJustAdded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const size = SIZES[index % SIZES.length];
   const hasDiscount = item.originalPrice && item.originalPrice > item.price;
-  const isFav = favorites && favorites.has(item.id);
+  const isFav = isFavProp !== undefined ? isFavProp : (favorites && favorites.has(item.id));
 
   const handleMouseMove = useCallback((e) => {
     if (!ref.current) return;
@@ -149,3 +152,5 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
     </motion.div>
   );
 }
+
+export default React.memo(MenuItemCard);
