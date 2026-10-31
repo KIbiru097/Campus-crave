@@ -84,14 +84,34 @@ export default function QRMenuPage() {
   const menu = MOCK_MENU;
   const cats = ['All', 'Coffee', 'Pastries', 'Breakfast', 'Sandwiches', 'Salads', 'Desserts', 'Cold Drinks'];
 
-  const filtered = search.trim()
-    ? menu.filter(i => i.name.toLowerCase().includes(search.toLowerCase()) || i.description.toLowerCase().includes(search.toLowerCase()) || i.tags?.some(t => t.toLowerCase().includes(search.toLowerCase())))
-    : menu;
+  // ⚡ Bolt Optimization: Memoize filtered and grouped menu lists to avoid re-computing
+  // on unrelated state updates (e.g., cart changes, sheet opens, scrolling animations).
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return menu;
+    return menu.filter(i =>
+      i.name.toLowerCase().includes(q) ||
+      i.description.toLowerCase().includes(q) ||
+      i.tags?.some(t => t.toLowerCase().includes(q))
+    );
+  }, [search, menu]);
 
-  const grouped = cats.reduce((a, c) => { if (c === 'All') return a; const items = filtered.filter(i => i.category === c); if (items.length) a[c] = items; return a; }, {});
+  const grouped = React.useMemo(() => {
+    return cats.reduce((a, c) => {
+      if (c === 'All') return a;
+      const items = filtered.filter(i => i.category === c);
+      if (items.length) a[c] = items;
+      return a;
+    }, {});
+  }, [filtered]);
 
-  const shown = cat === 'All' ? filtered : filtered.filter(i => i.category === cat);
-  const shownGrouped = cat === 'All' ? grouped : { [cat]: shown };
+  const shown = React.useMemo(() => {
+    return cat === 'All' ? filtered : filtered.filter(i => i.category === cat);
+  }, [cat, filtered]);
+
+  const shownGrouped = React.useMemo(() => {
+    return cat === 'All' ? grouped : { [cat]: shown };
+  }, [cat, grouped, shown]);
 
   const cartQty = useCallback(id => { const c = cart.find(x => x.id === id); return c ? c.quantity : 0; }, [cart]);
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
@@ -154,7 +174,7 @@ export default function QRMenuPage() {
                   </div>
                   <div className="qr-grid">
                     {items.map((item, i) => (
-                      <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} favorites={favs} onToggleFav={toggleFav} />
+                      <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} isFav={favs.has(item.id)} onToggleFav={toggleFav} />
                     ))}
                   </div>
                 </section>
@@ -164,7 +184,7 @@ export default function QRMenuPage() {
             <section className="qr-section" style={{ paddingTop: 28 }}>
               <div className="qr-grid">
                 {shown.map((item, i) => (
-                  <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} favorites={favs} onToggleFav={toggleFav} />
+                  <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} isFav={favs.has(item.id)} onToggleFav={toggleFav} />
                 ))}
               </div>
             </section>
