@@ -3,7 +3,14 @@ import { motion } from 'framer-motion';
 
 const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
 
-export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
+/**
+ * Performance Optimization (Bolt):
+ * Memoize MenuItemCard with React.memo to prevent unnecessary re-renders across the
+ * entire menu grid when cart quantities change for other items, or when favorites/detail
+ * state changes. Since parent callbacks (onAdd, onRemove, onDetail, onToggleFav) and item data
+ * are stable, only the specific card whose cartQty or favorites status changes will re-render.
+ */
+function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
   const ref = useRef(null);
   const [justAdded, setJustAdded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -149,3 +156,5 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
     </motion.div>
   );
 }
+
+export default React.memo(MenuItemCard);
