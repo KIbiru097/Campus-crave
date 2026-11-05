@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Lenis from 'lenis';
@@ -93,7 +93,15 @@ export default function QRMenuPage() {
   const shown = cat === 'All' ? filtered : filtered.filter(i => i.category === cat);
   const shownGrouped = cat === 'All' ? grouped : { [cat]: shown };
 
-  const cartQty = useCallback(id => { const c = cart.find(x => x.id === id); return c ? c.quantity : 0; }, [cart]);
+  // ⚡ Bolt Optimization: Precompute item quantities into a Map so lookup is O(1)
+  // and we pass a scalar boolean `isFav` and `cartQty` directly to memoized MenuItemCard
+  const cartQtyMap = useMemo(() => {
+    const map = new Map();
+    for (const item of cart) {
+      map.set(item.id, (map.get(item.id) || 0) + item.quantity);
+    }
+    return map;
+  }, [cart]);
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
 
   const addCart = useCallback(d => {
@@ -154,7 +162,7 @@ export default function QRMenuPage() {
                   </div>
                   <div className="qr-grid">
                     {items.map((item, i) => (
-                      <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} favorites={favs} onToggleFav={toggleFav} />
+                      <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQtyMap.get(item.id) || 0} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} isFav={favs.has(item.id)} onToggleFav={toggleFav} />
                     ))}
                   </div>
                 </section>
@@ -164,7 +172,7 @@ export default function QRMenuPage() {
             <section className="qr-section" style={{ paddingTop: 28 }}>
               <div className="qr-grid">
                 {shown.map((item, i) => (
-                  <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} favorites={favs} onToggleFav={toggleFav} />
+                  <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQtyMap.get(item.id) || 0} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} isFav={favs.has(item.id)} onToggleFav={toggleFav} />
                 ))}
               </div>
             </section>
