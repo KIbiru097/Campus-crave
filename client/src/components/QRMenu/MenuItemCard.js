@@ -3,14 +3,16 @@ import { motion } from 'framer-motion';
 
 const SIZES = ['hero', 'wide', 'sm', 'tall', 'sm', 'featured', 'sm', 'wide'];
 
-export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, favorites, onToggleFav }) {
+// ⚡ Bolt Optimization: Memoize MenuItemCard with custom comparison to avoid re-rendering
+// all items in the menu grid when cart items or other unrelated state changes.
+// Only re-render when item data, index, cartQty, favorite status, or handlers change.
+function MenuItemCard({ item, index, cartQty, onAdd, onRemove, onDetail, isFav, onToggleFav }) {
   const ref = useRef(null);
   const [justAdded, setJustAdded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const size = SIZES[index % SIZES.length];
   const hasDiscount = item.originalPrice && item.originalPrice > item.price;
-  const isFav = favorites && favorites.has(item.id);
 
   const handleMouseMove = useCallback((e) => {
     if (!ref.current) return;
@@ -149,3 +151,16 @@ export default function MenuItemCard({ item, index, cartQty, onAdd, onRemove, on
     </motion.div>
   );
 }
+
+export default React.memo(MenuItemCard, (prevProps, nextProps) => {
+  return (
+    prevProps.item === nextProps.item &&
+    prevProps.index === nextProps.index &&
+    prevProps.cartQty === nextProps.cartQty &&
+    prevProps.isFav === nextProps.isFav &&
+    prevProps.onAdd === nextProps.onAdd &&
+    prevProps.onRemove === nextProps.onRemove &&
+    prevProps.onDetail === nextProps.onDetail &&
+    prevProps.onToggleFav === nextProps.onToggleFav
+  );
+});
