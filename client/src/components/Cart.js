@@ -3,9 +3,11 @@ import { useQuery, useMutation } from '@apollo/client';
 import { Link, useNavigate } from 'react-router-dom';
 import { GET_CART } from '../graphql/queries';
 import { UPDATE_CART_ITEM, REMOVE_FROM_CART, CLEAR_CART } from '../graphql/mutations';
+import { useToast } from '../context/ToastContext';
 
 const Cart = () => {
     const navigate = useNavigate();
+    const { toast } = useToast();
     const [paymentRules, setPaymentRules] = useState(null);
     
     const { loading, error, data, refetch } = useQuery(GET_CART);
@@ -79,7 +81,7 @@ const Cart = () => {
         const newQty = currentQty + change;
         if (newQty < 1) return;
         if (newQty > 6) {
-            alert('Maximum 6 items per order');
+            toast.warning('Maximum 6 items per order');
             return;
         }
         
@@ -90,7 +92,7 @@ const Cart = () => {
             refetch();
         } catch (err) {
             console.error('Error updating quantity:', err);
-            alert('Failed to update quantity');
+            toast.error('Failed to update quantity');
         }
     };
 
@@ -100,9 +102,10 @@ const Cart = () => {
                 variables: { cartItemId }
             });
             refetch();
+            toast.info('Item removed from cart');
         } catch (err) {
             console.error('Error removing item:', err);
-            alert('Failed to remove item');
+            toast.error('Failed to remove item');
         }
     };
 
@@ -111,20 +114,21 @@ const Cart = () => {
             try {
                 await clearCart();
                 refetch();
+                toast.info('Cart cleared');
             } catch (err) {
                 console.error('Error clearing cart:', err);
-                alert('Failed to clear cart');
+                toast.error('Failed to clear cart');
             }
         }
     };
 
     const handleProceedToCheckout = () => {
         if (!items.length) {
-            alert('Your cart is empty');
+            toast.warning('Your cart is empty');
             return;
         }
         if (itemCount > 6) {
-            alert('Maximum 6 items per order. Please remove some items.');
+            toast.warning('Maximum 6 items per order. Please remove some items.');
             return;
         }
         navigate('/checkout');

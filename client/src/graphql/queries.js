@@ -206,3 +206,82 @@ export const GET_MY_CAFES = gql`
         }
     }
 `;
+
+export const GET_CAFE_ORDERS = gql`
+    query GetCafeOrders($cafeId: ID, $status: String, $limit: Int) {
+        cafeOrders(cafe_id: $cafeId, status: $status, limit: $limit) {
+            id
+            order_number
+            order_status
+            total_amount
+            item_count
+            payment_type
+            delivery_address
+            special_instructions
+            created_at
+            updated_at
+            student {
+                id
+                full_name
+                phone_number
+                department
+                institution
+            }
+            items {
+                id
+                quantity
+                unit_price
+                subtotal
+                menu_item {
+                    id
+                    name
+                    category
+                }
+            }
+            delivery {
+                id
+                status
+                delivery_person {
+                    id
+                    username
+                    phone
+                }
+            }
+        }
+    }
+`;
+
+export const GET_AVAILABLE_ORDERS = gql`
+    query GetAvailableOrders {
+        availableOrders {
+            id
+            order_number
+            order_status
+            total_amount
+            item_count
+            payment_type
+            delivery_address
+            special_instructions
+            created_at
+            cafe {
+                id
+                name
+                location
+                contact_phone
+            }
+            student {
+                id
+                full_name
+                phone_number
+            }
+            items {
+                id
+                quantity
+                unit_price
+                menu_item {
+                    name
+                }
+            }
+        }
+    }
+`;

@@ -3,9 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@apollo/client';
 import { GET_CART } from '../graphql/queries';
 import { CREATE_ORDER } from '../graphql/mutations';
+import { useToast } from '../context/ToastContext';
 
 const CheckoutPage = () => {
     const navigate = useNavigate();
+    const { toast } = useToast();
     const [paymentMethod, setPaymentMethod] = useState('Online');
     const [deliveryAddress, setDeliveryAddress] = useState('');
     const [specialInstructions, setSpecialInstructions] = useState('');
@@ -107,8 +109,8 @@ const CheckoutPage = () => {
                 const order = orderData.createOrder;
 
                 if (paymentMethod === 'COD') {
-                    // Show success and redirect to orders
-                    alert(`✅ Order placed successfully!\n\nOrder #: ${order.order_number}\nTotal: ETB ${grandTotal}\nPayment: Cash on Delivery\nDelivery Address: ${deliveryAddress}\n\nYour order will be delivered within 30-45 minutes.`);
+                    // Show toast and redirect to orders
+                    toast.success(`Order #${order.order_number} placed successfully! Delivered within 30-45 minutes.`, 6000);
                     navigate('/orders');
                 } else {
                     // For online payment, calculate payment amount

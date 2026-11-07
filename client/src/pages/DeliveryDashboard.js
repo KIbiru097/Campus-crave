@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { GET_AVAILABLE_ORDERS } from '../graphql/queries';
+import { ASSIGN_DELIVERY, UPDATE_DELIVERY_STATUS } from '../graphql/mutations';
 
 const GET_MY_DELIVERIES = gql`
     query GetMyDeliveries($status: String) {
@@ -38,27 +41,24 @@ const GET_MY_DELIVERIES = gql`
     }
 `;
 
-const UPDATE_DELIVERY_STATUS = gql`
-    mutation UpdateDeliveryStatus($deliveryId: ID!, $status: String!) {
-        updateDeliveryStatus(delivery_id: $deliveryId, status: $status) {
-            id
-            status
-            pickup_time
-            delivered_time
-        }
-    }
-`;
-
 const DeliveryDashboard = () => {
     const { user } = useAuth();
+    const { toast } = useToast();
+    const [mainTab, setMainTab] = useState('assigned'); // 'assigned' | 'available'
     const [filterStatus, setFilterStatus] = useState(null);
     const [updating, setUpdating] = useState(false);
 
     const { data, loading, error, refetch } = useQuery(GET_MY_DELIVERIES, {
         variables: { status: filterStatus },
+        pollInterval: 12000,
+    });
+
+    const { data: availableData, loading: availableLoading, refetch: refetchAvailable } = useQuery(GET_AVAILABLE_ORDERS, {
+        pollInterval: 12000,
     });
 
     const [updateDeliveryStatus] = useMutation(UPDATE_DELIVERY_STATUS);
+    const [assignDelivery, { loading: claimingDelivery }] = useMutation(ASSIGN_DELIVERY);
 
     if (!user || user.role !== 'delivery') {
         return (
@@ -70,6 +70,7 @@ const DeliveryDashboard = () => {
     }
 
     const deliveries = data?.myDeliveries || [];
+    const availableOrders = availableData?.availableOrders || [];
 
     const handleStatusUpdate = async (deliveryId, newStatus) => {
         setUpdating(true);
@@ -78,12 +79,29 @@ const DeliveryDashboard = () => {
                 variables: { deliveryId, status: newStatus }
             });
             refetch();
-            alert(`Delivery status updated to ${newStatus}`);
+            toast.success(`Delivery status updated to ${newStatus}!`);
         } catch (err) {
             console.error('Error updating status:', err);
-            alert('Failed to update status');
+            toast.error(err.message || 'Failed to update delivery status');
         } finally {
             setUpdating(false);
+        }
+    };
+
+    const handleClaimOrder = async (orderId, orderNumber) => {
+        try {
+            await assignDelivery({
+                variables: {
+                    orderId: String(orderId),
+                    deliveryPersonId: String(user.id),
+                },
+            });
+            toast.success(`Order #${orderNumber} claimed! It is now in your active deliveries.`);
+            refetch();
+            refetchAvailable();
+            setMainTab('assigned');
+        } catch (err) {
+            toast.error(err.message || 'Failed to claim delivery order');
         }
     };
 
@@ -127,52 +145,229 @@ const DeliveryDashboard = () => {
 
     return (
         <div style={styles.container}>
-            <h1 style={styles.title}>🚚 Delivery Dashboard</h1>
-            <p style={styles.subtitle}>Manage your deliveries and update status</p>
-
-            {/* Filter Section */}
-            <div style={styles.filterSection}>
-                <label>Filter by status:</label>
-                <select 
-                    value={filterStatus || ''} 
-                    onChange={(e) => setFilterStatus(e.target.value || null)}
-                    style={styles.filterSelect}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
+                <div>
+                    <h1 style={styles.title}>🚚 Delivery Dashboard</h1>
+                    <p style={styles.subtitle}>Claim available orders and manage active campus deliveries</p>
+                </div>
+                <button
+                    onClick={() => { refetch(); refetchAvailable(); }}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#FFF3E0',
+                        color: '#E8532B',
+                        border: '1px solid #FFE0C4',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                    }}
                 >
-                    <option value="">All Deliveries</option>
-                    <option value="ASSIGNED">Assigned</option>
-                    <option value="PICKED_UP">Picked Up</option>
-                    <option value="ON_THE_WAY">On The Way</option>
-                    <option value="DELIVERED">Delivered</option>
-                    <option value="FAILED">Failed</option>
-                </select>
-                <button style={styles.refreshBtn} onClick={() => refetch()}>🔄 Refresh</button>
+                    🔄 Refresh All
+                </button>
             </div>
 
-            {/* Stats Cards */}
-            <div style={styles.statsGrid}>
-                <div style={styles.statCard}>
-                    <div style={styles.statNumber}>{deliveries.length}</div>
-                    <div style={styles.statLabel}>Total Deliveries</div>
-                </div>
-                <div style={styles.statCard}>
-                    <div style={styles.statNumber}>
-                        {deliveries.filter(d => d.status === 'ASSIGNED').length}
-                    </div>
-                    <div style={styles.statLabel}>Assigned</div>
-                </div>
-                <div style={styles.statCard}>
-                    <div style={styles.statNumber}>
-                        {deliveries.filter(d => d.status === 'ON_THE_WAY').length}
-                    </div>
-                    <div style={styles.statLabel}>In Progress</div>
-                </div>
-                <div style={styles.statCard}>
-                    <div style={styles.statNumber}>
-                        {deliveries.filter(d => d.status === 'DELIVERED').length}
-                    </div>
-                    <div style={styles.statLabel}>Completed</div>
-                </div>
+            {/* Dashboard Tabs */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', borderBottom: '1px solid #E5E7EB', paddingBottom: '12px' }}>
+                <button
+                    onClick={() => setMainTab('assigned')}
+                    style={{
+                        padding: '10px 18px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        backgroundColor: mainTab === 'assigned' ? '#E8532B' : '#F3F4F6',
+                        color: mainTab === 'assigned' ? '#fff' : '#4B5563',
+                        fontWeight: 600,
+                        fontSize: '14.5px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                    }}
+                >
+                    📦 My Deliveries
+                    <span style={{
+                        fontSize: '12px',
+                        padding: '2px 7px',
+                        borderRadius: '10px',
+                        backgroundColor: mainTab === 'assigned' ? 'rgba(255,255,255,0.25)' : '#E5E7EB',
+                        color: mainTab === 'assigned' ? '#fff' : '#374151',
+                    }}>
+                        {deliveries.length}
+                    </span>
+                </button>
+
+                <button
+                    onClick={() => setMainTab('available')}
+                    style={{
+                        padding: '10px 18px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        backgroundColor: mainTab === 'available' ? '#E8532B' : '#F3F4F6',
+                        color: mainTab === 'available' ? '#fff' : '#4B5563',
+                        fontWeight: 600,
+                        fontSize: '14.5px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                    }}
+                >
+                    ⚡ Available to Claim
+                    <span style={{
+                        fontSize: '12px',
+                        padding: '2px 7px',
+                        borderRadius: '10px',
+                        backgroundColor: mainTab === 'available' ? 'rgba(255,255,255,0.25)' : '#E5E7EB',
+                        color: mainTab === 'available' ? '#fff' : '#374151',
+                    }}>
+                        {availableOrders.length}
+                    </span>
+                </button>
             </div>
+
+            {/* View 1: Available Orders to Claim */}
+            {mainTab === 'available' && (
+                <div>
+                    {availableLoading ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {[1, 2].map((i) => (
+                                <div key={i} className="skeleton" style={{ height: '160px', borderRadius: '12px' }} />
+                            ))}
+                        </div>
+                    ) : availableOrders.length === 0 ? (
+                        <div style={styles.emptyContainer}>
+                            <div style={styles.emptyIcon}>✨</div>
+                            <h3>All caught up!</h3>
+                            <p>There are no unassigned delivery orders right now. Check back in a few minutes.</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {availableOrders.map((order) => (
+                                <div
+                                    key={order.id}
+                                    style={{
+                                        backgroundColor: '#fff',
+                                        border: '1.5px solid #FFE0C4',
+                                        borderRadius: '14px',
+                                        padding: '20px',
+                                        boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+                                        <div>
+                                            <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#1F2937' }}>
+                                                Order #{order.order_number}
+                                            </span>
+                                            <span style={{ marginLeft: '10px', fontSize: '12px', fontWeight: 600, padding: '3px 8px', borderRadius: '8px', backgroundColor: '#EFF6FF', color: '#1D4ED8' }}>
+                                                {order.order_status}
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#E8532B' }}>
+                                            ETB {order.total_amount?.toFixed(2) || '0.00'}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+                                        <div style={{ backgroundColor: '#FFFDF9', border: '1px solid #FFE0C4', borderRadius: '10px', padding: '12px' }}>
+                                            <div style={{ fontWeight: 600, color: '#E8532B', marginBottom: '4px' }}>🏪 Pickup From:</div>
+                                            <div style={{ fontWeight: 600, color: '#1F2937' }}>{order.cafe?.name}</div>
+                                            <div style={{ fontSize: '13px', color: '#6B5E52' }}>📍 {order.cafe?.location}</div>
+                                            {order.cafe?.contact_phone && (
+                                                <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                                                    📞 <a href={`tel:${order.cafe.contact_phone}`} style={{ color: '#E8532B', textDecoration: 'none' }}>{order.cafe.contact_phone}</a>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '10px', padding: '12px' }}>
+                                            <div style={{ fontWeight: 600, color: '#15803D', marginBottom: '4px' }}>📍 Deliver To:</div>
+                                            <div style={{ fontWeight: 600, color: '#1F2937' }}>{order.delivery_address || 'Campus Dorm'}</div>
+                                            <div style={{ fontSize: '13px', color: '#4B5563' }}>👤 {order.student?.full_name || 'Student'}</div>
+                                            {order.student?.phone_number && (
+                                                <div style={{ fontSize: '13px', marginTop: '4px' }}>
+                                                    📞 <a href={`tel:${order.student.phone_number}`} style={{ color: '#15803D', textDecoration: 'none' }}>{order.student.phone_number}</a>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderTop: '1px solid #F3F4F6', paddingTop: '12px' }}>
+                                        <div style={{ fontSize: '13.5px', color: '#6B7280' }}>
+                                            Items ({order.items?.length || 0}): {order.items?.map(i => `${i.quantity}x ${i.menu_item?.name}`).join(', ')}
+                                        </div>
+                                        <button
+                                            onClick={() => handleClaimOrder(order.id, order.order_number)}
+                                            disabled={claimingDelivery}
+                                            style={{
+                                                padding: '10px 20px',
+                                                backgroundColor: '#E8532B',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                fontWeight: 600,
+                                                fontSize: '14px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                            }}
+                                        >
+                                            ⚡ Claim This Delivery
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* View 2: Assigned Deliveries */}
+            {mainTab === 'assigned' && (
+                <>
+                    {/* Filter Section */}
+                    <div style={styles.filterSection}>
+                        <label>Filter by status:</label>
+                        <select 
+                            value={filterStatus || ''} 
+                            onChange={(e) => setFilterStatus(e.target.value || null)}
+                            style={styles.filterSelect}
+                        >
+                            <option value="">All Deliveries</option>
+                            <option value="ASSIGNED">Assigned</option>
+                            <option value="PICKED_UP">Picked Up</option>
+                            <option value="ON_THE_WAY">On The Way</option>
+                            <option value="DELIVERED">Delivered</option>
+                            <option value="FAILED">Failed</option>
+                        </select>
+                        <button style={styles.refreshBtn} onClick={() => refetch()}>🔄 Refresh</button>
+                    </div>
+
+                    {/* Stats Cards */}
+                    <div style={styles.statsGrid}>
+                        <div style={styles.statCard}>
+                            <div style={styles.statNumber}>{deliveries.length}</div>
+                            <div style={styles.statLabel}>Total Deliveries</div>
+                        </div>
+                        <div style={styles.statCard}>
+                            <div style={styles.statNumber}>
+                                {deliveries.filter(d => d.status === 'ASSIGNED').length}
+                            </div>
+                            <div style={styles.statLabel}>Assigned</div>
+                        </div>
+                        <div style={styles.statCard}>
+                            <div style={styles.statNumber}>
+                                {deliveries.filter(d => d.status === 'ON_THE_WAY').length}
+                            </div>
+                            <div style={styles.statLabel}>In Progress</div>
+                        </div>
+                        <div style={styles.statCard}>
+                            <div style={styles.statNumber}>
+                                {deliveries.filter(d => d.status === 'DELIVERED').length}
+                            </div>
+                            <div style={styles.statLabel}>Completed</div>
+                        </div>
+                    </div>
 
             {/* Deliveries List */}
             {deliveries.length === 0 ? (
@@ -262,6 +457,8 @@ const DeliveryDashboard = () => {
                     })}
                 </div>
             )}
+        </>
+        )}
         </div>
     );
 };
@@ -278,8 +475,8 @@ const styles = {
         fontSize: '28px',
     },
     subtitle: {
-        color: '#FFB84D',
-        marginBottom: '30px',
+        color: '#6B5E52',
+        marginBottom: '20px',
     },
     unauthorized: {
         textAlign: 'center',

@@ -319,6 +319,7 @@ const typeDefs = gql`
         # Delivery queries
         myDeliveries(status: String): [Delivery!]!
         deliveries(limit: Int): [Delivery!]!
+        availableOrders: [Order!]!
     }
 
     # ============== MUTATIONS ==============

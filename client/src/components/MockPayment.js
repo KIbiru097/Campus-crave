@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const MockPayment = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { toast } = useToast();
     
     const txRef = searchParams.get('tx_ref');
     const amount = searchParams.get('amount');
@@ -38,7 +40,7 @@ const MockPayment = () => {
                         });
                     }, 1000);
                 } else {
-                    alert('Payment verification failed');
+                    toast.error('Payment verification failed');
                     navigate('/cart');
                 }
             } catch (error) {

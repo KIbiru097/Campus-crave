@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, gql } from '@apollo/client';
 import { GET_CAFES, GET_USERS } from '../graphql/queries';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 // GraphQL Mutations
 const CREATE_STAFF = gql`
@@ -50,6 +51,7 @@ const RESTORE_CAFE = gql`
 
 const AdminDashboard = () => {
     const { user } = useAuth();
+    const { toast } = useToast();
     const [activeTab, setActiveTab] = useState('overview');
     const [showAddCafe, setShowAddCafe] = useState(false);
     const [showCreateStaff, setShowCreateStaff] = useState(false);
@@ -100,9 +102,9 @@ const AdminDashboard = () => {
             refetchCafes();
             setShowAddCafe(false);
             setNewCafe({ name: '', description: '', location: '', contact_phone: '' });
-            alert('✅ Cafe registered successfully!');
+            toast.success('Cafe registered successfully!');
         } catch (err) {
-            alert('Error: ' + err.message);
+            toast.error('Error: ' + err.message);
         }
     };
 
@@ -122,29 +124,29 @@ const AdminDashboard = () => {
                     }
                 }
             });
-            alert(`✅ ${newStaff.role.toUpperCase()} account created successfully!`);
+            toast.success(`${newStaff.role.toUpperCase()} account created successfully!`);
             refetchUsers();
             setShowCreateStaff(false);
             setNewStaff({ username: '', email: '', password: '', full_name: '', phone: '', role: 'staff', cafe_id: '' });
         } catch (err) {
-            alert('Error: ' + err.message);
+            toast.error('Error: ' + err.message);
         }
     };
 
     const handleAssignOwner = async () => {
         if (!selectedCafeId || !selectedUserId) {
-            alert('Please select both cafe and user');
+            toast.warning('Please select both cafe and user');
             return;
         }
         try {
             await assignCafeOwner({ variables: { cafeId: selectedCafeId, userId: selectedUserId } });
-            alert('✅ Owner assigned successfully!');
+            toast.success('Owner assigned successfully!');
             setShowAssignOwner(false);
             setSelectedCafeId('');
             setSelectedUserId('');
             refetchCafes();
         } catch (err) {
-            alert('Error: ' + err.message);
+            toast.error('Error: ' + err.message);
         }
     };
 
@@ -153,9 +155,9 @@ const AdminDashboard = () => {
             try {
                 await softDeleteCafe({ variables: { id: cafeId } });
                 refetchCafes();
-                alert('✅ Cafe moved to trash');
+                toast.info('Cafe moved to trash');
             } catch (err) {
-                alert('Error: ' + err.message);
+                toast.error('Error: ' + err.message);
             }
         }
     };
@@ -164,9 +166,9 @@ const AdminDashboard = () => {
         try {
             await restoreCafe({ variables: { id: cafeId } });
             refetchCafes();
-            alert('✅ Cafe restored successfully!');
+            toast.success('Cafe restored successfully!');
         } catch (err) {
-            alert('Error: ' + err.message);
+            toast.error('Error: ' + err.message);
         }
     };
 

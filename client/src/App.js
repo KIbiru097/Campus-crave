@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ApolloProvider } from '@apollo/client';
 import client from './apollo/client';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import Navbar from './components/Layout/Navbar';
 import Home from './pages/Home';
 import Login from './components/Auth/Login';
@@ -100,7 +101,9 @@ function App() {
         <ApolloProvider client={client}>
             <Router>
                 <AuthProvider>
-                    <AppContent />
+                    <ToastProvider>
+                        <AppContent />
+                    </ToastProvider>
                 </AuthProvider>
             </Router>
         </ApolloProvider>

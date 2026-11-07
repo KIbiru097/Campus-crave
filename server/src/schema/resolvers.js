@@ -328,7 +328,10 @@ const resolvers = {
         },
         
         users: async (_, { role, limit = 100, offset = 0 }, { user }) => {
-            if (!user || user.role !== 'admin') throw new Error('Not authorized');
+            if (!user) throw new Error('Not authenticated');
+            // Admins can list all users; Cafe owners & staff can list delivery drivers to dispatch orders
+            const isManagerForDelivery = (user.role === 'owner' || user.role === 'staff') && role === 'delivery';
+            if (user.role !== 'admin' && !isManagerForDelivery) throw new Error('Not authorized');
             
             try {
                 let query = 'SELECT id, username, email, phone, role, created_at, last_login FROM users WHERE deleted_at IS NULL';
@@ -439,6 +442,29 @@ const resolvers = {
             } catch (error) {
                 console.error('Error fetching deliveries:', error);
                 throw new Error('Failed to fetch deliveries');
+            }
+        },
+
+        availableOrders: async (_, __, { user }) => {
+            if (!user) throw new Error('Not authenticated');
+            if (user.role !== 'delivery' && user.role !== 'admin') throw new Error('Not authorized');
+            
+            try {
+                const result = await pool.query(
+                    `SELECT o.*, c.name as cafe_name, c.location as cafe_location
+                     FROM orders o
+                     JOIN cafes c ON o.cafe_id = c.id
+                     LEFT JOIN deliveries d ON d.order_id = o.id AND d.status NOT IN ('CANCELLED', 'FAILED')
+                     WHERE o.deleted_at IS NULL
+                       AND o.order_status IN ('CONFIRMED', 'PREPARING', 'READY')
+                       AND d.id IS NULL
+                     ORDER BY o.created_at ASC
+                     LIMIT 50`
+                );
+                return result.rows;
+            } catch (error) {
+                console.error('Error fetching available delivery orders:', error);
+                throw new Error('Failed to fetch available delivery orders');
             }
         },
 
@@ -1963,9 +1989,22 @@ const resolvers = {
         // Delivery Mutations
         assignDelivery: async (_, { order_id, delivery_person_id }, { user }) => {
             if (!user) throw new Error('Not authenticated');
-            if (user.role !== 'admin') throw new Error('Not authorized');
+            // Admins, cafe owners, and cafe staff can assign deliveries
+            // Delivery drivers can self-claim an available order
+            const isManager = ['admin', 'owner', 'staff'].includes(user.role);
+            const isDriverSelfAssign = user.role === 'delivery' && parseInt(delivery_person_id) === parseInt(user.id);
+            if (!isManager && !isDriverSelfAssign) throw new Error('Not authorized to assign delivery');
             
             try {
+                // Check if delivery already exists for this order
+                const existing = await pool.query(
+                    `SELECT id, status FROM deliveries WHERE order_id = $1 AND status NOT IN ('CANCELLED', 'FAILED')`,
+                    [order_id]
+                );
+                if (existing.rows.length > 0) {
+                    throw new Error('This order is already assigned for delivery');
+                }
+
                 const result = await pool.query(
                     `INSERT INTO deliveries (order_id, delivery_person_id, assigned_by, status) 
                      VALUES ($1, $2, $3, 'ASSIGNED') 
@@ -1974,7 +2013,7 @@ const resolvers = {
                 );
                 
                 await pool.query(
-                    `UPDATE orders SET order_status = 'ON_THE_WAY' WHERE id = $1`,
+                    `UPDATE orders SET order_status = 'ON_THE_WAY', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
                     [order_id]
                 );
                 
@@ -1984,7 +2023,7 @@ const resolvers = {
                 return delivery;
             } catch (error) {
                 console.error('Assign delivery error:', error);
-                throw new Error('Failed to assign delivery');
+                throw new Error(error.message || 'Failed to assign delivery');
             }
         },
         
