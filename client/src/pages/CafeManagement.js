@@ -453,7 +453,7 @@ const styles = {
         fontSize: '28px',
     },
     subtitle: {
-        color: '#FFB84D',
+        color: '#6B5E52',
         marginBottom: '30px',
     },
     unauthorized: {

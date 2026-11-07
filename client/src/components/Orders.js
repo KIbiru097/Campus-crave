@@ -6,7 +6,23 @@ import { GET_MY_ORDERS } from '../graphql/queries';
 const Orders = () => {
     const { loading, error, data } = useQuery(GET_MY_ORDERS);
 
-    if (loading) return <div className="loading">Loading orders...</div>;
+    if (loading) {
+        return (
+            <div style={styles.container}>
+                <h2 style={styles.title}>📋 My Orders</h2>
+                <div style={styles.ordersList}>
+                    {[1, 2, 3].map((i) => (
+                        <div key={i} style={styles.orderCard}>
+                            <div className="skeleton" style={{ height: '24px', width: '45%', marginBottom: '12px', borderRadius: '6px' }} />
+                            <div className="skeleton" style={{ height: '16px', width: '60%', marginBottom: '8px', borderRadius: '4px' }} />
+                            <div className="skeleton" style={{ height: '16px', width: '35%', marginBottom: '14px', borderRadius: '4px' }} />
+                            <div className="skeleton" style={{ height: '40px', width: '100%', borderRadius: '8px' }} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
     if (error) return <div className="error">Error: {error.message}</div>;
 
     const orders = data?.myOrders || [];
@@ -17,7 +33,7 @@ const Orders = () => {
                 <div style={styles.emptyIcon}>📦</div>
                 <h2>No Orders Yet</h2>
                 <p>Start ordering from your favorite cafes!</p>
-                <Link to="/">
+                <Link to="/cafes">
                     <button style={styles.browseBtn}>
                         Browse Cafes
                     </button>
@@ -28,13 +44,13 @@ const Orders = () => {
 
     const getStatusColor = (status) => {
         switch (status?.toLowerCase()) {
-            case 'pending': return '#f39c12';
+            case 'pending': return '#D97706';
             case 'confirmed': return '#E8532B';
-            case 'preparing': return '#FFB84D';
-            case 'ready': return '#E8532B';
-            case 'delivered': return '#FF7A3D';
+            case 'preparing': return '#D97706';
+            case 'ready': return '#2E7D32';
+            case 'delivered': return '#1976D2';
             case 'cancelled': return '#FFE0C4';
-            default: return '#FFB84D';
+            default: return '#D97706';
         }
     };
 

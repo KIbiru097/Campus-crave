@@ -94,7 +94,7 @@ const styles = {
     },
     subtitle: {
         fontSize: '1rem',
-        color: '#FFB84D',
+        color: '#6B5E52',
     },
     grid: {
         display: 'grid',
@@ -128,7 +128,7 @@ const styles = {
         textAlign: 'center',
     },
     description: {
-        color: '#FFB84D',
+        color: '#6B5E52',
         lineHeight: '1.5',
         marginBottom: '0.75rem',
         textAlign: 'center',
@@ -138,7 +138,7 @@ const styles = {
         display: 'flex',
         justifyContent: 'space-between',
         fontSize: '0.75rem',
-        color: '#FFB84D',
+        color: '#7A4B20',
         marginBottom: '0.75rem',
         flexWrap: 'wrap',
         gap: '0.5rem',
@@ -179,7 +179,7 @@ const styles = {
     },
     viewMore: {
         textAlign: 'center',
-        color: '#FFB84D',
+        color: '#E8532B',
         fontWeight: '600',
         fontSize: '0.85rem',
     },

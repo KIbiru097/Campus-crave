@@ -130,7 +130,24 @@ const Cart = () => {
         navigate('/checkout');
     };
 
-    if (loading) return <div className="loading">Loading cart...</div>;
+    if (loading) {
+        return (
+            <div style={styles.container}>
+                <h2 style={styles.title}>🛒 Shopping Cart</h2>
+                <div style={styles.itemsContainer}>
+                    {[1, 2].map((i) => (
+                        <div key={i} style={styles.cartItem}>
+                            <div style={{ flex: 1 }}>
+                                <div className="skeleton" style={{ height: '22px', width: '50%', marginBottom: '10px', borderRadius: '6px' }} />
+                                <div className="skeleton" style={{ height: '16px', width: '25%', borderRadius: '4px' }} />
+                            </div>
+                            <div className="skeleton" style={{ height: '36px', width: '100px', borderRadius: '8px' }} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
     if (error) return <div className="error">Error: {error.message}</div>;
 
     if (items.length === 0) {
@@ -139,7 +156,7 @@ const Cart = () => {
                 <div style={styles.emptyIcon}>🛒</div>
                 <h2>Your Cart is Empty</h2>
                 <p>Add items from our cafes to get started!</p>
-                <Link to="/">
+                <Link to="/cafes">
                     <button style={styles.browseBtn}>Browse Cafes</button>
                 </Link>
             </div>

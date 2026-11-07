@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ApolloProvider } from '@apollo/client';
 import client from './apollo/client';
@@ -8,18 +8,28 @@ import Home from './pages/Home';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import MenuPage from './pages/MenuPage';
-import CartPage from './pages/CartPage';
-import OrdersPage from './pages/OrdersPage';
-import ProfilePage from './pages/ProfilePage';
-import CheckoutPage from './pages/CheckoutPage';
-import PaymentPage from './pages/PaymentPage';
-import MockPayment from './components/MockPayment';
-import AdminDashboard from './pages/AdminDashboard';
-import CafeManagement from './pages/CafeManagement';
-import DeliveryDashboard from './pages/DeliveryDashboard';
-import QRMenuPage from './pages/QRMenuPage';
-import QRCodeGenerator from './pages/QRCodeGenerator';
 import CafeList from './components/CafeList';
+
+// Code-split dynamic and role-based routes for faster initial load
+const CartPage = lazy(() => import('./pages/CartPage'));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
+const PaymentPage = lazy(() => import('./pages/PaymentPage'));
+const OrdersPage = lazy(() => import('./pages/OrdersPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const MockPayment = lazy(() => import('./components/MockPayment'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const CafeManagement = lazy(() => import('./pages/CafeManagement'));
+const DeliveryDashboard = lazy(() => import('./pages/DeliveryDashboard'));
+const QRMenuPage = lazy(() => import('./pages/QRMenuPage'));
+const QRCodeGenerator = lazy(() => import('./pages/QRCodeGenerator'));
+
+const PageLoader = () => (
+    <div style={{ padding: '40px 20px', maxWidth: '800px', margin: '0 auto' }}>
+        <div className="skeleton" style={{ height: '36px', width: '220px', marginBottom: '20px', borderRadius: '8px' }} />
+        <div className="skeleton" style={{ height: '160px', width: '100%', marginBottom: '16px', borderRadius: '14px' }} />
+        <div className="skeleton" style={{ height: '160px', width: '100%', borderRadius: '14px' }} />
+    </div>
+);
 
 const ProtectedRoute = ({ children }) => {
     const { user } = useAuth();
@@ -51,35 +61,37 @@ const NotFound = () => (
 
 function AppContent() {
     return (
-        <Routes>
-            <Route path="/qr-menu/:tableId" element={<QRMenuPage />} />
-            <Route path="/qr-codes" element={<QRCodeGenerator />} />
-            <Route path="*" element={
-                <>
-                    <Navbar />
-                    <div style={{ minHeight: 'calc(100vh - 60px)', padding: '20px' }}>
-                        <Routes>
-                            <Route path="/" element={<Home />} />
-                            <Route path="/cafes" element={<CafeList />} />
-                            <Route path="/login" element={<Login />} />
-                            <Route path="/register" element={<Register />} />
-                            <Route path="/cafe/:cafeId" element={<MenuPage />} />
-                            <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
-                            <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-                            <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
-                            <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
-                            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-                            <Route path="/mock-payment" element={<ProtectedRoute><MockPayment /></ProtectedRoute>} />
-                            <Route path="/payment/success" element={<ProtectedRoute><MockPayment /></ProtectedRoute>} />
-                            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-                            <Route path="/cafe-management" element={<OwnerRoute><CafeManagement /></OwnerRoute>} />
-                            <Route path="/delivery-dashboard" element={<DeliveryRoute><DeliveryDashboard /></DeliveryRoute>} />
-                            <Route path="*" element={<NotFound />} />
-                        </Routes>
-                    </div>
-                </>
-            } />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+            <Routes>
+                <Route path="/qr-menu/:tableId" element={<QRMenuPage />} />
+                <Route path="/qr-codes" element={<QRCodeGenerator />} />
+                <Route path="*" element={
+                    <>
+                        <Navbar />
+                        <div style={{ minHeight: 'calc(100vh - 60px)', padding: '20px' }}>
+                            <Routes>
+                                <Route path="/" element={<Home />} />
+                                <Route path="/cafes" element={<CafeList />} />
+                                <Route path="/login" element={<Login />} />
+                                <Route path="/register" element={<Register />} />
+                                <Route path="/cafe/:cafeId" element={<MenuPage />} />
+                                <Route path="/cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+                                <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+                                <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
+                                <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+                                <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                                <Route path="/mock-payment" element={<ProtectedRoute><MockPayment /></ProtectedRoute>} />
+                                <Route path="/payment/success" element={<ProtectedRoute><MockPayment /></ProtectedRoute>} />
+                                <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+                                <Route path="/cafe-management" element={<OwnerRoute><CafeManagement /></OwnerRoute>} />
+                                <Route path="/delivery-dashboard" element={<DeliveryRoute><DeliveryDashboard /></DeliveryRoute>} />
+                                <Route path="*" element={<NotFound />} />
+                            </Routes>
+                        </div>
+                    </>
+                } />
+            </Routes>
+        </Suspense>
     );
 }
 
