@@ -1151,8 +1151,9 @@ const resolvers = {
         
         login: async (_, { input }, { req }) => {
             try {
-                const ip = req?.ip || req?.connection?.remoteAddress || 'unknown';
-                if (!checkRateLimit(ip)) {
+                const forwarded = req?.headers?.['x-forwarded-for'];
+                const ip = (forwarded ? forwarded.split(',')[0].trim() : (req?.ip || req?.socket?.remoteAddress || req?.connection?.remoteAddress)) || 'unknown';
+                if (ip !== 'unknown' && !checkRateLimit(ip)) {
                     throw new Error('Too many login attempts. Please try again later.');
                 }
                 

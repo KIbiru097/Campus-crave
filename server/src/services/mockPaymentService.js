@@ -16,10 +16,12 @@ class MockPaymentService {
         console.log(`   Email: ${email}`);
         console.log(`   Reference: ${txRef}`);
         
+        const frontendUrl = process.env.FRONTEND_URL || 'https://cumcravestuorder.vercel.app';
+        
         // Always return success for demo
         return {
             success: true,
-            paymentUrl: `http://localhost:3000/mock-payment?tx_ref=${txRef}&amount=${amount}&order_id=${orderId}`,
+            paymentUrl: `${frontendUrl}/mock-payment?tx_ref=${txRef}&amount=${amount}&order_id=${orderId}`,
             txRef: txRef,
             isMock: true
         };

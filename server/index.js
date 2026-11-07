@@ -101,6 +101,28 @@ app.get('/api/payment/verify/:txRef', async (req, res) => {
     try {
         const { txRef } = req.params;
         const result = await MockPaymentService.verifyPayment(txRef);
+        
+        if (result && result.success) {
+            const match = txRef.match(/^MOCK-(\d+)-/);
+            if (match && match[1]) {
+                const orderId = parseInt(match[1], 10);
+                try {
+                    const pool = require('./src/config/database');
+                    await pool.query(
+                        "UPDATE orders SET order_status = 'CONFIRMED', updated_at = NOW() WHERE id = $1 AND order_status = 'PENDING'",
+                        [orderId]
+                    );
+                    await pool.query(
+                        "UPDATE payments SET payment_status = 'Completed', transaction_id = $1, processed_at = NOW() WHERE order_id = $2",
+                        [txRef, orderId]
+                    );
+                    console.log(`✅ Order #${orderId} confirmed and payment marked Completed for tx ${txRef}`);
+                } catch (dbErr) {
+                    console.error('Error updating order/payment state on verify:', dbErr);
+                }
+            }
+        }
+
         res.json(result);
     } catch (error) {
         console.error('Payment verification error:', error);
@@ -165,7 +187,7 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user };
+                return { user, req };
             },
         })
     );
