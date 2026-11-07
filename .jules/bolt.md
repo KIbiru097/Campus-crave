@@ -1,0 +1,3 @@
+## 2026-11-07 - Request-Scoped Promise Caching for Nested GraphQL Resolvers
+**Learning:** In Apollo Server without DataLoader, list queries (such as `myOrders`, `cafeOrders`, `availableOrders`) trigger N+1 individual queries on nested fields like `cafe`, `student`, and `delivery`. Injecting a request-scoped `Map` in the Apollo `context` and caching the in-flight query Promise (`pool.query(...)`) allows concurrent resolver executions for the same entity ID to await the exact same database call without installing additional external dependencies or altering the architectural layer.
+**Action:** When optimizing GraphQL nested field resolvers without external libraries, pass a per-request `Map` in context and cache by `${entity}:${id}` with the Promise as the value.
