@@ -85,6 +85,9 @@ function recordLoginFailure(ip, email) {
             accountLockStore.set(cleanEmail, { firstFail: now, failCount: 1 });
         } else {
             acc.failCount++;
+            if (acc.failCount >= ACCOUNT_LOCK_MAX) {
+                console.error(`🔒 [SECURITY - ACCOUNT LOCKED] Email: ${cleanEmail} locked for 15 minutes after ${acc.failCount} failed attempts. Attacker IP: ${ip}`);
+            }
         }
     }
 
@@ -94,6 +97,9 @@ function recordLoginFailure(ip, email) {
             ipFailStore.set(ip, { firstFail: now, failCount: 1 });
         } else {
             ipEntry.failCount++;
+            if (ipEntry.failCount >= IP_FAIL_MAX) {
+                console.error(`🚫 [SECURITY - IP THROTTLED] Attacker IP: ${ip} exceeded ${IP_FAIL_MAX} failed login attempts across accounts!`);
+            }
         }
     }
 }
@@ -420,13 +426,15 @@ const resolvers = {
             }
         },
         
-        user: async (_, { id }, { user }) => {
+        user: async (_, { id }, { user, req }) => {
             if (!user) throw new Error('Not authenticated');
 
             // Object-level authorization check: Only the account owner or an admin can access this profile
             const isSelf = parseInt(user.id, 10) === parseInt(id, 10);
             const isAdmin = user.role === 'admin';
             if (!isSelf && !isAdmin) {
+                const ip = req?.ip || (req?.headers?.['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req?.socket?.remoteAddress) || 'unknown';
+                console.warn(`🚨 [SECURITY - IDOR BLOCKED] IP: ${ip} | User: ${user.id} (${user.role}) attempted unauthorized access to User ID: ${id}`);
                 throw new Error('Not authorized');
             }
             
@@ -1256,6 +1264,7 @@ const resolvers = {
             // Check IP and account throttle before proceeding
             const throttle = checkLoginThrottle(ip, input?.email);
             if (!throttle.allowed) {
+                console.warn(`🚨 [SECURITY - BRUTE FORCE BLOCKED] IP: ${ip} | Email: ${input?.email} | Status: BLOCKED (${throttle.message})`);
                 throw new Error(throttle.message);
             }
 
@@ -1267,6 +1276,7 @@ const resolvers = {
                 
                 if (userResult.rows.length === 0) {
                     recordLoginFailure(ip, input.email);
+                    console.warn(`⚠️ [SECURITY - FAILED LOGIN] IP: ${ip} | Attempted Email: ${input?.email} (User not found)`);
                     throw new Error('Invalid email or password');
                 }
                 
@@ -1275,11 +1285,13 @@ const resolvers = {
                 
                 if (!validPassword) {
                     recordLoginFailure(ip, input.email);
+                    console.warn(`⚠️ [SECURITY - FAILED LOGIN] IP: ${ip} | Email: ${input?.email} (Wrong password)`);
                     throw new Error('Invalid email or password');
                 }
                 
                 // Clear failure history on successful authentication
                 clearLoginFailure(ip, input.email);
+                console.log(`✅ [AUTH - LOGIN SUCCESS] IP: ${ip} | User ID: ${user.id} | Email: ${user.email} (${user.role})`);
 
                 await pool.query(
                     'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',

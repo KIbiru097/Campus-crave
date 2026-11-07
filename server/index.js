@@ -45,6 +45,7 @@ const corsOptions = {
         // For unlisted origins in production:
         // Gracefully disallow by passing (null, false).
         // The cors package omits Access-Control-Allow-Origin without throwing an unhandled exception or 500 error.
+        console.warn(`🛡️ [SECURITY - CORS BLOCKED] Rejected unauthorized origin: ${origin}`);
         return callback(null, false);
     },
     credentials: true,
