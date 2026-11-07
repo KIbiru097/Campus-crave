@@ -15,6 +15,7 @@ const PORT = process.env.PORT || 4000;
 
 // Simple CORS configuration - Allow Vercel frontend
 const allowedOrigins = [
+    'https://cumcravestuorder.vercel.app',
     'https://kb-campus-web.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001',
@@ -132,7 +133,7 @@ app.get('/api/payment/callback', (req, res) => {
     const { tx_ref, status, order_id } = req.query;
     console.log(`📞 Payment Callback: ${tx_ref} - ${status}`);
     
-    const frontendUrl = process.env.FRONTEND_URL || 'https://kb-campus-web.vercel.app';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://cumcravestuorder.vercel.app';
     res.redirect(`${frontendUrl}/payment/success?tx_ref=${tx_ref}&status=${status}&order_id=${order_id}`);
 });
 

@@ -21,7 +21,11 @@ fi
 
 echo ""
 echo "2️⃣ Updating database with real hashes..."
-PGPASSWORD=ANb1VfHFQnLLGzzvEzjCHIm7KushYuDp psql -h dpg-d9etmodaeets73bv8gng-a.oregon-postgres.render.com -U campus_crave_student_user campus_crave_student << 'SQL'
+if [ -z "$DATABASE_URL" ] && [ -z "$PGPASSWORD" ]; then
+    echo "⚠️  Set DATABASE_URL or PGPASSWORD, PGHOST, PGUSER before running this step."
+    echo "Example: PGPASSWORD=your_password psql -h your_host -U your_user your_dbname"
+else
+    psql "${DATABASE_URL:-postgresql://$PGUSER:$PGPASSWORD@$PGHOST/$PGDATABASE}" << 'SQL'
 -- These are pre-generated bcrypt hashes for testing
 UPDATE users SET password_hash = '$2b$10$QxKPRQm9xyHdrVn2nYfE5enlKx8LnIuWQcT0M2M0M0M0M0M0M0M' WHERE email = 'admin@campuscrave.com';
 UPDATE users SET password_hash = '$2b$10$QxKPRQm9xyHdrVn2nYfE5enlKx8LnIuWQcT0M2M0M0M0M0M0M0M' WHERE email = 'student1@test.com';
@@ -32,6 +36,7 @@ UPDATE users SET password_hash = '$2b$10$QxKPRQm9xyHdrVn2nYfE5enlKx8LnIuWQcT0M2M
 
 SELECT '✅ Real hashes updated!' as status;
 SQL
+fi
 
 echo ""
 echo "3️⃣ Testing login..."

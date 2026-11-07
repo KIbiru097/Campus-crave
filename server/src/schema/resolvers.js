@@ -3,9 +3,19 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const pool = require('../config/database');
 
-// PubSub for subscriptions
-const { PubSub } = require('graphql-subscriptions');
-const pubsub = new PubSub();
+// PubSub for subscriptions (with fallback if module not installed)
+let pubsub;
+try {
+    const { PubSub } = require('graphql-subscriptions');
+    pubsub = new PubSub();
+} catch (e) {
+    const EventEmitter = require('events');
+    const emitter = new EventEmitter();
+    pubsub = {
+        publish: (event, payload) => emitter.emit(event, payload),
+        asyncIterator: (events) => emitter
+    };
+}
 
 // Subscription event names
 const EVENTS = {
@@ -33,12 +43,13 @@ function checkRateLimit(ip) {
 }
 
 // Clean up old rate limit entries periodically
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
     const now = Date.now();
     for (const [ip, entry] of rateLimitStore) {
         if (now - entry.windowStart > RATE_LIMIT_WINDOW * 2) rateLimitStore.delete(ip);
     }
 }, 60000);
+if (cleanupInterval.unref) cleanupInterval.unref();
 
 // Audit logging helper
 async function logAudit(userId, action, entityType, entityId, details, ipAddress) {
