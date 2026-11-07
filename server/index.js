@@ -13,25 +13,38 @@ const PORT = process.env.PORT || 4000;
 
 // ==================== CORS CONFIGURATION ====================
 
-// Simple CORS configuration - Allow Vercel frontend
 const allowedOrigins = [
     'https://cumcravestuorder.vercel.app',
-    'https://kb-campus-web.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001',
 ];
 
 const corsOptions = {
     origin: function (origin, callback) {
-        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-            callback(null, true);
-        } else {
-            callback(null, true); // Allow all in dev; tighten for production
+        // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+        if (!origin) {
+            return callback(null, true);
         }
+        
+        // Allow defined origins and Vercel branch/preview domains
+        const isAllowed = allowedOrigins.includes(origin) || origin.endsWith('.vercel.app');
+        if (isAllowed) {
+            return callback(null, origin);
+        }
+        
+        // In local development, permit any origin
+        if (process.env.NODE_ENV !== 'production') {
+            return callback(null, origin);
+        }
+        
+        // For unlisted origins in production:
+        // Gracefully disallow by passing (null, false).
+        // The cors package omits Access-Control-Allow-Origin without throwing an unhandled exception or 500 error.
+        return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     exposedHeaders: ['Content-Length'],
     maxAge: 86400
 };
@@ -164,7 +177,7 @@ app.get('/api/payment/callback', (req, res) => {
 const server = new ApolloServer({
     typeDefs,
     resolvers,
-    introspection: true,
+    introspection: process.env.NODE_ENV !== 'production' || process.env.GRAPHQL_INTROSPECTION === 'true',
     formatError: (err) => {
         console.error('GraphQL Error:', err.message);
         return {
@@ -191,6 +204,15 @@ async function startServer() {
             },
         })
     );
+
+    // Fallback JSON error handler to prevent raw HTML stack traces
+    app.use((err, req, res, next) => {
+        console.error('Unhandled server error:', err.message);
+        res.status(err.status || 500).json({
+            success: false,
+            error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+        });
+    });
 
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`

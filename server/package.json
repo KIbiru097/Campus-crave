@@ -2,7 +2,7 @@
   "name": "campus-crave-api",
   "version": "1.0.0",
   "description": "Campus Crave GraphQL API",
-  "main": "src/index.js",
+  "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js"

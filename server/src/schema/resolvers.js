@@ -25,28 +25,93 @@ const EVENTS = {
     DELIVERY_STATUS_CHANGED: 'DELIVERY_STATUS_CHANGED',
 };
 
-// Rate limiting store (in-memory)
-const rateLimitStore = new Map();
-const RATE_LIMIT_WINDOW = 60 * 1000;
-const RATE_LIMIT_MAX = 30;
+// Rate limiting & Account Lockout stores (in-memory)
+// 1. IP rate limiting: max 10 failed login attempts per IP per 5 minutes
+// 2. Account lockout: max 5 consecutive failed attempts per email per 15 minutes
+const ipFailStore = new Map();
+const accountLockStore = new Map();
 
-function checkRateLimit(ip) {
+const IP_FAIL_WINDOW = 5 * 60 * 1000;
+const IP_FAIL_MAX = 10;
+
+const ACCOUNT_LOCK_WINDOW = 15 * 60 * 1000;
+const ACCOUNT_LOCK_MAX = 5;
+
+function checkLoginThrottle(ip, email) {
     const now = Date.now();
-    const entry = rateLimitStore.get(ip);
-    if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW) {
-        rateLimitStore.set(ip, { windowStart: now, count: 1 });
-        return true;
+    const cleanEmail = (email || '').toLowerCase().trim();
+
+    // Check account lockout
+    if (cleanEmail) {
+        const acc = accountLockStore.get(cleanEmail);
+        if (acc && now - acc.firstFail < ACCOUNT_LOCK_WINDOW) {
+            if (acc.failCount >= ACCOUNT_LOCK_MAX) {
+                const remainingMinutes = Math.ceil((ACCOUNT_LOCK_WINDOW - (now - acc.firstFail)) / 60000);
+                return {
+                    allowed: false,
+                    message: `Account is temporarily locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute(s).`
+                };
+            }
+        } else if (acc && now - acc.firstFail >= ACCOUNT_LOCK_WINDOW) {
+            accountLockStore.delete(cleanEmail);
+        }
     }
-    entry.count++;
-    if (entry.count > RATE_LIMIT_MAX) return false;
-    return true;
+
+    // Check IP rate limit
+    if (ip && ip !== 'unknown') {
+        const ipEntry = ipFailStore.get(ip);
+        if (ipEntry && now - ipEntry.firstFail < IP_FAIL_WINDOW) {
+            if (ipEntry.failCount >= IP_FAIL_MAX) {
+                return {
+                    allowed: false,
+                    message: 'Too many failed login attempts from this network. Please wait a few minutes before trying again.'
+                };
+            }
+        } else if (ipEntry && now - ipEntry.firstFail >= IP_FAIL_WINDOW) {
+            ipFailStore.delete(ip);
+        }
+    }
+
+    return { allowed: true };
+}
+
+function recordLoginFailure(ip, email) {
+    const now = Date.now();
+    const cleanEmail = (email || '').toLowerCase().trim();
+
+    if (cleanEmail) {
+        const acc = accountLockStore.get(cleanEmail);
+        if (!acc || now - acc.firstFail >= ACCOUNT_LOCK_WINDOW) {
+            accountLockStore.set(cleanEmail, { firstFail: now, failCount: 1 });
+        } else {
+            acc.failCount++;
+        }
+    }
+
+    if (ip && ip !== 'unknown') {
+        const ipEntry = ipFailStore.get(ip);
+        if (!ipEntry || now - ipEntry.firstFail >= IP_FAIL_WINDOW) {
+            ipFailStore.set(ip, { firstFail: now, failCount: 1 });
+        } else {
+            ipEntry.failCount++;
+        }
+    }
+}
+
+function clearLoginFailure(ip, email) {
+    const cleanEmail = (email || '').toLowerCase().trim();
+    if (cleanEmail) accountLockStore.delete(cleanEmail);
+    if (ip && ip !== 'unknown') ipFailStore.delete(ip);
 }
 
 // Clean up old rate limit entries periodically
 const cleanupInterval = setInterval(() => {
     const now = Date.now();
-    for (const [ip, entry] of rateLimitStore) {
-        if (now - entry.windowStart > RATE_LIMIT_WINDOW * 2) rateLimitStore.delete(ip);
+    for (const [email, entry] of accountLockStore) {
+        if (now - entry.firstFail > ACCOUNT_LOCK_WINDOW) accountLockStore.delete(email);
+    }
+    for (const [ip, entry] of ipFailStore) {
+        if (now - entry.firstFail > IP_FAIL_WINDOW) ipFailStore.delete(ip);
     }
 }, 60000);
 if (cleanupInterval.unref) cleanupInterval.unref();
@@ -1186,19 +1251,23 @@ const resolvers = {
         },
         
         login: async (_, { input }, { req }) => {
+            const forwarded = req?.headers?.['x-forwarded-for'];
+            const ip = (forwarded ? forwarded.split(',')[0].trim() : (req?.ip || req?.socket?.remoteAddress || req?.connection?.remoteAddress)) || 'unknown';
+            
+            // Check IP and account throttle before proceeding
+            const throttle = checkLoginThrottle(ip, input?.email);
+            if (!throttle.allowed) {
+                throw new Error(throttle.message);
+            }
+
             try {
-                const forwarded = req?.headers?.['x-forwarded-for'];
-                const ip = (forwarded ? forwarded.split(',')[0].trim() : (req?.ip || req?.socket?.remoteAddress || req?.connection?.remoteAddress)) || 'unknown';
-                if (ip !== 'unknown' && !checkRateLimit(ip)) {
-                    throw new Error('Too many login attempts. Please try again later.');
-                }
-                
                 const userResult = await pool.query(
                     'SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL',
                     [input.email]
                 );
                 
                 if (userResult.rows.length === 0) {
+                    recordLoginFailure(ip, input.email);
                     throw new Error('Invalid email or password');
                 }
                 
@@ -1206,9 +1275,13 @@ const resolvers = {
                 const validPassword = await bcrypt.compare(input.password, user.password_hash);
                 
                 if (!validPassword) {
+                    recordLoginFailure(ip, input.email);
                     throw new Error('Invalid email or password');
                 }
                 
+                // Clear failure history on successful authentication
+                clearLoginFailure(ip, input.email);
+
                 await pool.query(
                     'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
                     [user.id]
@@ -1227,8 +1300,8 @@ const resolvers = {
                 
                 return { token, refreshToken, user };
             } catch (error) {
-                console.error('Login error:', error);
-                throw new Error(error.message || 'Login failed');
+                console.error('Login error:', error.message);
+                throw error;
             }
         },
         
@@ -1957,6 +2030,19 @@ const resolvers = {
             }
         },
         
+        verifyStudentWithOCR: async (_, { id_image_base64, full_name }, { user }) => {
+            if (!user) throw new Error('Not authenticated');
+            if (user.role !== 'student' && user.role !== 'admin') {
+                throw new Error('Not authorized: Student verification requires student role');
+            }
+            return {
+                success: false,
+                extracted_name: full_name || null,
+                confidence: 0,
+                message: 'OCR verification service is temporarily undergoing maintenance. Please present your student ID to cafeteria staff or campus admin for manual verification.'
+            };
+        },
+
         createStaff: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
             if (user.role !== 'admin') throw new Error('Only admin can create staff');
