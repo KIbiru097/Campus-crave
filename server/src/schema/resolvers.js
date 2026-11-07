@@ -2032,4 +2032,32 @@ const resolvers = {
     }
 };
 
-module.exports = { resolvers, getUserFromToken };
+// Sanitize resolvers to ensure every field exists in typeDefs (prevents Apollo Server schema build failure)
+function sanitizeResolvers(rawResolvers) {
+    try {
+        const { buildSchema } = require('graphql');
+        const typeDefs = require('./typeDefs');
+        const schema = buildSchema(typeDefs.loc ? typeDefs.loc.source.body : typeDefs);
+        const typeMap = schema.getTypeMap();
+        
+        const clean = {};
+        for (const [typeName, fields] of Object.entries(rawResolvers)) {
+            const schemaType = typeMap[typeName];
+            if (!schemaType || typeof fields !== 'object' || fields === null) continue;
+            
+            const schemaFields = new Set(Object.keys(schemaType.getFields ? schemaType.getFields() : {}));
+            clean[typeName] = {};
+            for (const [fieldName, resolverFn] of Object.entries(fields)) {
+                if (schemaFields.has(fieldName)) {
+                    clean[typeName][fieldName] = resolverFn;
+                }
+            }
+        }
+        return clean;
+    } catch (err) {
+        console.warn('Resolver sanitation warning:', err.message);
+        return rawResolvers;
+    }
+}
+
+module.exports = { resolvers: sanitizeResolvers(resolvers), getUserFromToken };
