@@ -1063,24 +1063,48 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        // ⚡ BOLT OPTIMIZATION: Request-scoped cache lookup prevents N+1 cafe queries
+        // when resolving lists of orders belonging to the same cafes.
+        // Expected impact: Reduces database queries from O(N) to O(distinct cafes) per request.
+        cafe: async (order, _, context) => {
             try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
+                const cacheKey = `cafe:${order.cafe_id}`;
+                if (context?.cache?.has(cacheKey)) {
+                    return context.cache.get(cacheKey);
+                }
+                const fetchPromise = pool.query(
+                    'SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL',
+                    [order.cafe_id]
+                ).then(res => res.rows[0] || null);
+
+                if (context?.cache) {
+                    context.cache.set(cacheKey, fetchPromise);
+                }
+                return await fetchPromise;
             } catch (error) {
                 return null;
             }
         },
-        student: async (order) => {
+        // ⚡ BOLT OPTIMIZATION: Request-scoped cache lookup prevents N+1 student queries
+        // when resolving order lists (e.g. cafeOrders, availableOrders) for recurring students.
+        student: async (order, _, context) => {
             try {
-                const result = await pool.query(
+                const cacheKey = `student:${order.student_id}`;
+                if (context?.cache?.has(cacheKey)) {
+                    return context.cache.get(cacheKey);
+                }
+                const fetchPromise = pool.query(
                     `SELECT s.*, u.username, u.email
                      FROM students s
                      JOIN users u ON s.user_id = u.id
                      WHERE s.id = $1 AND u.deleted_at IS NULL`,
                     [order.student_id]
-                );
-                return result.rows[0] || null;
+                ).then(res => res.rows[0] || null);
+
+                if (context?.cache) {
+                    context.cache.set(cacheKey, fetchPromise);
+                }
+                return await fetchPromise;
             } catch (error) {
                 return null;
             }
@@ -1118,16 +1142,25 @@ const resolvers = {
     },
 
     Delivery: {
-        order: async (delivery) => {
+        // ⚡ BOLT OPTIMIZATION: Memoize order lookup to prevent redundant order fetching
+        order: async (delivery, _, context) => {
             try {
-                const result = await pool.query(
+                const cacheKey = `delivery_order:${delivery.order_id}`;
+                if (context?.cache?.has(cacheKey)) {
+                    return context.cache.get(cacheKey);
+                }
+                const fetchPromise = pool.query(
                     `SELECT o.*, c.name as cafe_name, c.location as cafe_location
                      FROM orders o
                      JOIN cafes c ON o.cafe_id = c.id
                      WHERE o.id = $1 AND o.deleted_at IS NULL`,
                     [delivery.order_id]
-                );
-                return result.rows[0] || null;
+                ).then(res => res.rows[0] || null);
+
+                if (context?.cache) {
+                    context.cache.set(cacheKey, fetchPromise);
+                }
+                return await fetchPromise;
             } catch (error) {
                 return null;
             }
