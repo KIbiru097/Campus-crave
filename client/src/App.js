@@ -19,6 +19,7 @@ import CafeManagement from './pages/CafeManagement';
 import DeliveryDashboard from './pages/DeliveryDashboard';
 import QRMenuPage from './pages/QRMenuPage';
 import QRCodeGenerator from './pages/QRCodeGenerator';
+import CafeList from './components/CafeList';
 
 const ProtectedRoute = ({ children }) => {
     const { user } = useAuth();
@@ -59,6 +60,7 @@ function AppContent() {
                     <div style={{ minHeight: 'calc(100vh - 60px)', padding: '20px' }}>
                         <Routes>
                             <Route path="/" element={<Home />} />
+                            <Route path="/cafes" element={<CafeList />} />
                             <Route path="/login" element={<Login />} />
                             <Route path="/register" element={<Register />} />
                             <Route path="/cafe/:cafeId" element={<MenuPage />} />

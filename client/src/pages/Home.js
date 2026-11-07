@@ -195,10 +195,7 @@ const Home = () => {
                     ))}
                 </div>
                 <div style={styles.viewAll}>
-                    <Link to="/" onClick={(e) => {
-                        e.preventDefault();
-                        document.querySelector('[style*="cafesSection"]')?.scrollIntoView({ behavior: 'smooth' });
-                    }}>
+                    <Link to="/cafes">
                         <button style={styles.viewAllBtn}>View All Cafes →</button>
                     </Link>
                 </div>

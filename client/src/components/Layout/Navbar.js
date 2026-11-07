@@ -126,6 +126,9 @@ const Navbar = () => {
                         <Link to="/" className={`cc-nav-link ${isActive('/') ? 'active' : ''}`}>
                             🏠 Home
                         </Link>
+                        <Link to="/cafes" className={`cc-nav-link ${isActive('/cafes') ? 'active' : ''}`}>
+                            🏪 Cafes
+                        </Link>
 
                         {user ? (
                             <>
