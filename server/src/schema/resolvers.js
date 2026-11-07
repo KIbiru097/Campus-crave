@@ -433,7 +433,7 @@ const resolvers = {
             const isSelf = parseInt(user.id, 10) === parseInt(id, 10);
             const isAdmin = user.role === 'admin';
             if (!isSelf && !isAdmin) {
-                const ip = req?.ip || (req?.headers?.['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req?.socket?.remoteAddress) || 'unknown';
+                const ip = (req?.headers?.['cf-connecting-ip'] ? req.headers['cf-connecting-ip'].trim() : (req?.headers?.['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req?.ip)) || req?.socket?.remoteAddress || 'unknown';
                 console.warn(`🚨 [SECURITY - IDOR BLOCKED] IP: ${ip} | User: ${user.id} (${user.role}) attempted unauthorized access to User ID: ${id}`);
                 throw new Error('Not authorized');
             }
@@ -1259,7 +1259,7 @@ const resolvers = {
         },
         
         login: async (_, { input }, { req }) => {
-            const ip = req?.ip || (req?.headers?.['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req?.socket?.remoteAddress) || 'unknown';
+            const ip = (req?.headers?.['cf-connecting-ip'] ? req.headers['cf-connecting-ip'].trim() : (req?.headers?.['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req?.ip)) || req?.socket?.remoteAddress || 'unknown';
             
             // Check IP and account throttle before proceeding
             const throttle = checkLoginThrottle(ip, input?.email);

@@ -59,7 +59,30 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health and CORS preflight handled by middleware above
+// Helper to extract true client IP behind Cloudflare and Render reverse proxies
+function getClientIp(req) {
+    if (!req) return 'unknown';
+    const cfIp = req.headers?.['cf-connecting-ip'];
+    if (cfIp) return cfIp.trim();
+    const forwarded = req.headers?.['x-forwarded-for'];
+    if (forwarded) return forwarded.split(',')[0].trim();
+    return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+// ==================== IP BLACKLIST / BLOCKING ====================
+// Block malicious IPs dynamically configured via BLOCKED_IPS env var (comma-separated)
+const blockedIps = new Set(
+    (process.env.BLOCKED_IPS || '').split(',').map(s => s.trim()).filter(Boolean)
+);
+
+app.use((req, res, next) => {
+    const clientIp = getClientIp(req);
+    if (clientIp && blockedIps.has(clientIp)) {
+        console.warn(`🛑 [SECURITY - BLACKLIST BLOCKED] Dropped connection from blacklisted IP: ${clientIp}`);
+        return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+    next();
+});
 
 // ==================== HEALTH CHECK ====================
 
@@ -69,7 +92,8 @@ app.get('/health', (req, res) => {
         app: 'Campus Crave API',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'development',
+        clientIp: getClientIp(req)
     });
 });
 
