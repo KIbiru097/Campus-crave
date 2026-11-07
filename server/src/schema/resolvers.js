@@ -357,6 +357,13 @@ const resolvers = {
         
         user: async (_, { id }, { user }) => {
             if (!user) throw new Error('Not authenticated');
+
+            // Object-level authorization check: Only the account owner or an admin can access this profile
+            const isSelf = parseInt(user.id, 10) === parseInt(id, 10);
+            const isAdmin = user.role === 'admin';
+            if (!isSelf && !isAdmin) {
+                throw new Error('Not authorized');
+            }
             
             try {
                 const result = await pool.query(
@@ -367,6 +374,9 @@ const resolvers = {
                 if (result.rows.length === 0) throw new Error('User not found');
                 return result.rows[0];
             } catch (error) {
+                if (error.message === 'Not authorized' || error.message === 'User not found') {
+                    throw error;
+                }
                 console.error('Error fetching user:', error);
                 throw new Error('Failed to fetch user');
             }
