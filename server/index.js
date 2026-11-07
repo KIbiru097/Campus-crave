@@ -9,15 +9,20 @@ const { resolvers, getUserFromToken } = require('./src/schema/resolvers');
 const MockPaymentService = require('./src/services/mockPaymentService');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 
 // ==================== CORS CONFIGURATION ====================
 
 const allowedOrigins = [
     'https://cumcravestuorder.vercel.app',
+    'https://kb-campus-web.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001',
 ];
+
+// Strictly allow only this project's Vercel preview/branch deployments (preventing foreign .vercel.app origins)
+const vercelPreviewRegex = /^https:\/\/(cumcravestuorder|kb-campus-web)(-[a-z0-9-]+)?\.vercel\.app$/;
 
 const corsOptions = {
     origin: function (origin, callback) {
@@ -26,8 +31,8 @@ const corsOptions = {
             return callback(null, true);
         }
         
-        // Allow defined origins and Vercel branch/preview domains
-        const isAllowed = allowedOrigins.includes(origin) || origin.endsWith('.vercel.app');
+        // Allow defined origins and project-specific Vercel branch/preview domains
+        const isAllowed = allowedOrigins.includes(origin) || vercelPreviewRegex.test(origin);
         if (isAllowed) {
             return callback(null, origin);
         }
@@ -223,7 +228,7 @@ ${'='.repeat(50)}
 💚 Health:       http://localhost:${PORT}/health
 🔧 Mock Payment: http://localhost:${PORT}/api/payment/initiate
 🌐 Environment:  ${process.env.NODE_ENV || 'development'}
-🔗 CORS:  wildcard *.vercel.app + localhost
+🔗 CORS:  ${allowedOrigins.join(', ')} + preview branches
 ${'='.repeat(50)}
         `);
     });

@@ -1251,8 +1251,7 @@ const resolvers = {
         },
         
         login: async (_, { input }, { req }) => {
-            const forwarded = req?.headers?.['x-forwarded-for'];
-            const ip = (forwarded ? forwarded.split(',')[0].trim() : (req?.ip || req?.socket?.remoteAddress || req?.connection?.remoteAddress)) || 'unknown';
+            const ip = req?.ip || (req?.headers?.['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req?.socket?.remoteAddress) || 'unknown';
             
             // Check IP and account throttle before proceeding
             const throttle = checkLoginThrottle(ip, input?.email);
