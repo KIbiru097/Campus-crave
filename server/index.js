@@ -9,6 +9,7 @@ const { resolvers, getUserFromToken } = require('./src/schema/resolvers');
 const MockPaymentService = require('./src/services/mockPaymentService');
 
 const app = express();
+app.disable('x-powered-by');
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 
@@ -89,11 +90,7 @@ app.use((req, res, next) => {
 app.get('/health', (req, res) => {
     res.json({
         status: 'OK',
-        app: 'Campus Crave API',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        environment: process.env.NODE_ENV || 'development',
-        clientIp: getClientIp(req)
+        timestamp: new Date().toISOString()
     });
 });
 

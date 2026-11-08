@@ -25,9 +25,16 @@ const EVENTS = {
     DELIVERY_STATUS_CHANGED: 'DELIVERY_STATUS_CHANGED',
 };
 
+// Helper to sanitize user-supplied free-text fields (strips HTML tags and caps length to prevent stored XSS)
+function sanitizeText(str, maxLength = 250) {
+    if (!str || typeof str !== 'string') return null;
+    const stripped = str.replace(/<[^>]*>?/gm, '').trim();
+    return stripped.length > 0 ? stripped.slice(0, maxLength) : null;
+}
+
 // Rate limiting & Account Lockout stores (in-memory)
 // 1. IP rate limiting: max 10 failed login attempts per IP per 5 minutes
-// 2. Account lockout: max 5 consecutive failed attempts per email per 15 minutes
+// 2. Account lockout: max 5 consecutive failed attempts per (IP + email) per 15 minutes (keyed by IP:email to prevent Lockout DoS)
 const ipFailStore = new Map();
 const accountLockStore = new Map();
 
@@ -40,10 +47,11 @@ const ACCOUNT_LOCK_MAX = 5;
 function checkLoginThrottle(ip, email) {
     const now = Date.now();
     const cleanEmail = (email || '').toLowerCase().trim();
+    const lockKey = ip ? `${ip}:${cleanEmail}` : cleanEmail;
 
-    // Check account lockout
+    // Check account lockout per IP:email
     if (cleanEmail) {
-        const acc = accountLockStore.get(cleanEmail);
+        const acc = accountLockStore.get(lockKey);
         if (acc && now - acc.firstFail < ACCOUNT_LOCK_WINDOW) {
             if (acc.failCount >= ACCOUNT_LOCK_MAX) {
                 const remainingMinutes = Math.ceil((ACCOUNT_LOCK_WINDOW - (now - acc.firstFail)) / 60000);
@@ -53,7 +61,7 @@ function checkLoginThrottle(ip, email) {
                 };
             }
         } else if (acc && now - acc.firstFail >= ACCOUNT_LOCK_WINDOW) {
-            accountLockStore.delete(cleanEmail);
+            accountLockStore.delete(lockKey);
         }
     }
 
@@ -78,15 +86,16 @@ function checkLoginThrottle(ip, email) {
 function recordLoginFailure(ip, email) {
     const now = Date.now();
     const cleanEmail = (email || '').toLowerCase().trim();
+    const lockKey = ip ? `${ip}:${cleanEmail}` : cleanEmail;
 
     if (cleanEmail) {
-        const acc = accountLockStore.get(cleanEmail);
+        const acc = accountLockStore.get(lockKey);
         if (!acc || now - acc.firstFail >= ACCOUNT_LOCK_WINDOW) {
-            accountLockStore.set(cleanEmail, { firstFail: now, failCount: 1 });
+            accountLockStore.set(lockKey, { firstFail: now, failCount: 1 });
         } else {
             acc.failCount++;
             if (acc.failCount >= ACCOUNT_LOCK_MAX) {
-                console.error(`🔒 [SECURITY - ACCOUNT LOCKED] Email: ${cleanEmail} locked for 15 minutes after ${acc.failCount} failed attempts. Attacker IP: ${ip}`);
+                console.error(`🔒 [SECURITY - ACCOUNT LOCKED] Email: ${cleanEmail} locked for IP ${ip} after ${acc.failCount} failed attempts.`);
             }
         }
     }
@@ -106,7 +115,8 @@ function recordLoginFailure(ip, email) {
 
 function clearLoginFailure(ip, email) {
     const cleanEmail = (email || '').toLowerCase().trim();
-    if (cleanEmail) accountLockStore.delete(cleanEmail);
+    const lockKey = ip ? `${ip}:${cleanEmail}` : cleanEmail;
+    if (cleanEmail) accountLockStore.delete(lockKey);
     if (ip && ip !== 'unknown') ipFailStore.delete(ip);
 }
 
@@ -1239,7 +1249,7 @@ const resolvers = {
 
             validateField(input.username, 3, 50, 'Username');
             validateField(input.email, 5, 100, 'Email');
-            validateField(input.password, 6, 100, 'Password');
+            validateField(input.password, 8, 100, 'Password');
             validateField(input.full_name, 2, 100, 'Full name');
             validateField(input.phone, 5, 20, 'Phone number');
             validateField(input.reg_no, 2, 50, 'Registration number');
@@ -1254,6 +1264,15 @@ const resolvers = {
                 }
             }
 
+            // F4: Enforce password complexity (at least 8 chars, 1 letter, 1 number, non-trivial)
+            if (!/[a-zA-Z]/.test(input.password) || !/[0-9]/.test(input.password)) {
+                throw new Error('Password must contain at least one letter and at least one number');
+            }
+            const commonWeakPasswords = ['12345678', '123456789', 'password123', 'admin123', 'campus123', 'student123', 'qwerty123'];
+            if (commonWeakPasswords.includes(input.password.toLowerCase())) {
+                throw new Error('Password is too common and weak. Please choose a stronger password');
+            }
+
             const cleanEmail = input.email.trim().toLowerCase();
             const cleanUsername = input.username.trim();
 
@@ -1261,20 +1280,13 @@ const resolvers = {
             try {
                 await client.query('BEGIN');
 
-                const existingEmail = await client.query(
-                    'SELECT id FROM users WHERE LOWER(email) = $1 AND deleted_at IS NULL',
-                    [cleanEmail]
+                // F6: Prevent user enumeration by checking both with a consistent response
+                const existingUser = await client.query(
+                    'SELECT id FROM users WHERE (LOWER(email) = $1 OR username = $2) AND deleted_at IS NULL',
+                    [cleanEmail, cleanUsername]
                 );
-                if (existingEmail.rows.length > 0) {
-                    throw new Error('Email already registered');
-                }
-                
-                const existingUsername = await client.query(
-                    'SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL',
-                    [cleanUsername]
-                );
-                if (existingUsername.rows.length > 0) {
-                    throw new Error('Username already taken');
+                if (existingUser.rows.length > 0) {
+                    throw new Error('An account with this email or username already exists. Please log in or use another credential.');
                 }
                 
                 const hashedPassword = await bcrypt.hash(input.password, 10);
@@ -1374,6 +1386,15 @@ const resolvers = {
         // Cart Mutations
         addToCart: async (_, { input }, { user }) => {
             if (!user) throw new Error('Not authenticated');
+
+            // F1: Strict quantity validation (prevent negative/zero/excessive quantities)
+            const quantity = parseInt(input.quantity, 10);
+            if (isNaN(quantity) || quantity < 1 || quantity > 6) {
+                throw new Error('Quantity must be an integer between 1 and 6');
+            }
+
+            // F2: Sanitize customizations (strip any HTML/script tags to prevent stored XSS)
+            const cleanCustomizations = sanitizeText(input.customizations, 200);
             
             try {
                 const studentResult = await pool.query(
@@ -1403,7 +1424,8 @@ const resolvers = {
                     [input.menu_item_id]
                 );
                 if (menuResult.rows.length === 0) throw new Error('Menu item not found');
-                const price = menuResult.rows[0].price;
+                const price = parseFloat(menuResult.rows[0].price);
+                if (isNaN(price) || price <= 0) throw new Error('Invalid menu item price');
                 
                 const existingItem = await pool.query(
                     'SELECT * FROM cart_items WHERE cart_id = $1 AND menu_item_id = $2',
@@ -1411,15 +1433,19 @@ const resolvers = {
                 );
                 
                 if (existingItem.rows.length > 0) {
+                    const newQty = existingItem.rows[0].quantity + quantity;
+                    if (newQty > 6) {
+                        throw new Error('Maximum 6 of this item allowed in cart');
+                    }
                     await pool.query(
-                        'UPDATE cart_items SET quantity = quantity + $1 WHERE id = $2',
-                        [input.quantity, existingItem.rows[0].id]
+                        'UPDATE cart_items SET quantity = $1, customizations = COALESCE($2, customizations) WHERE id = $3',
+                        [newQty, cleanCustomizations, existingItem.rows[0].id]
                     );
                 } else {
                     await pool.query(
                         `INSERT INTO cart_items (cart_id, menu_item_id, quantity, unit_price, customizations) 
                          VALUES ($1, $2, $3, $4, $5)`,
-                        [cart.id, input.menu_item_id, input.quantity, price, input.customizations || null]
+                        [cart.id, input.menu_item_id, quantity, price, cleanCustomizations]
                     );
                 }
                 
@@ -1432,8 +1458,12 @@ const resolvers = {
                 );
                 
                 const items = itemsResult.rows;
-                const total = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+                const total = items.reduce((sum, item) => sum + (parseFloat(item.unit_price) * item.quantity), 0);
                 const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+                
+                if (itemCount > 6) {
+                    throw new Error('Maximum 6 total items allowed per order');
+                }
                 
                 return {
                     ...cart,
@@ -1442,13 +1472,17 @@ const resolvers = {
                     item_count: itemCount
                 };
             } catch (error) {
-                console.error('Add to cart error:', error);
-                throw new Error('Failed to add to cart');
+                console.error('Add to cart error:', error.message);
+                throw new Error(error.message || 'Failed to add to cart');
             }
         },
         
         updateCartItem: async (_, { cart_item_id, quantity }, { user }) => {
             if (!user) throw new Error('Not authenticated');
+
+            const qty = parseInt(quantity, 10);
+            if (isNaN(qty)) throw new Error('Invalid quantity');
+            if (qty > 6) throw new Error('Maximum 6 items allowed per order');
             
             try {
                 const studentResult = await pool.query(
@@ -1468,12 +1502,12 @@ const resolvers = {
 
                 const cartId = cartItemCheck.rows[0].cart_id;
 
-                if (quantity <= 0) {
+                if (qty <= 0) {
                     await pool.query('DELETE FROM cart_items WHERE id = $1', [cart_item_id]);
                 } else {
                     await pool.query(
                         'UPDATE cart_items SET quantity = $1 WHERE id = $2',
-                        [quantity, cart_item_id]
+                        [qty, cart_item_id]
                     );
                 }
 
@@ -1488,13 +1522,17 @@ const resolvers = {
                     [cartId]
                 );
                 const items = itemsResult.rows;
-                const total = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+                const total = items.reduce((sum, item) => sum + (parseFloat(item.unit_price) * item.quantity), 0);
                 const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+                if (itemCount > 6) {
+                    throw new Error('Maximum 6 total items allowed per order');
+                }
 
                 return { ...cart, items, total, item_count: itemCount };
             } catch (error) {
-                console.error('Update cart item error:', error);
-                throw new Error('Failed to update cart');
+                console.error('Update cart item error:', error.message);
+                throw new Error(error.message || 'Failed to update cart');
             }
         },
         
@@ -1599,11 +1637,27 @@ const resolvers = {
                 
                 const items = itemsResult.rows;
                 if (items.length === 0) throw new Error('Cart is empty');
+
+                // F1: Rigorously validate cart items against negative/zero quantities and negative totals
+                for (const item of items) {
+                    const itemQty = parseInt(item.quantity, 10);
+                    const itemPrice = parseFloat(item.unit_price);
+                    if (isNaN(itemQty) || itemQty < 1 || itemQty > 6) {
+                        throw new Error('Cart contains invalid item quantity. Each item must have quantity between 1 and 6.');
+                    }
+                    if (isNaN(itemPrice) || itemPrice <= 0) {
+                        throw new Error('Cart contains invalid item price.');
+                    }
+                }
                 
-                const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-                if (itemCount > 6) throw new Error('Maximum 6 items per order');
+                const itemCount = items.reduce((sum, item) => sum + parseInt(item.quantity, 10), 0);
+                if (itemCount < 1 || itemCount > 6) throw new Error('Order must contain between 1 and 6 items total');
                 
-                const totalAmount = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+                // Recompute total amount on server side
+                const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.unit_price) * parseInt(item.quantity, 10)), 0);
+                if (isNaN(totalAmount) || totalAmount <= 0) {
+                    throw new Error('Invalid order total: total amount must be greater than zero');
+                }
                 
                 let paymentType = input.payment_type;
                 if (itemCount >= 4 && itemCount <= 6) {
@@ -1623,20 +1677,24 @@ const resolvers = {
                 const orderNumber = `ORD-${dateStr}-${String(todayCount).padStart(3, '0')}`;
                 // Example: ORD-20260721-001 (17 characters - well under 20!)
                 
+                // F2: Sanitize special instructions (strip HTML/scripts)
+                const cleanInstructions = sanitizeText(input.special_instructions, 250);
+
                 const orderResult = await pool.query(
                     `INSERT INTO orders (student_id, cafe_id, total_amount, item_count, payment_type, special_instructions, order_status, order_number) 
                      VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7) 
                      RETURNING *`,
-                    [studentId, input.cafe_id, totalAmount, itemCount, paymentType, input.special_instructions || null, orderNumber]
+                    [studentId, input.cafe_id, totalAmount, itemCount, paymentType, cleanInstructions, orderNumber]
                 );
                 
                 const order = orderResult.rows[0];
                 
                 for (const item of items) {
+                    const cleanCust = sanitizeText(item.customizations, 200);
                     await pool.query(
                         `INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price, subtotal, customizations) 
                          VALUES ($1, $2, $3, $4, $5, $6)`,
-                        [order.id, item.menu_item_id, item.quantity, item.unit_price, item.unit_price * item.quantity, item.customizations]
+                        [order.id, item.menu_item_id, item.quantity, item.unit_price, item.unit_price * item.quantity, cleanCust]
                     );
                 }
                 
@@ -1953,6 +2011,13 @@ const resolvers = {
             try {
                 const { cafe_id, name, description, price, category, preparation_time, image_url } = input;
                 
+                const cleanName = sanitizeText(name, 100);
+                if (!cleanName) throw new Error('Menu item name is required');
+                const cleanDesc = sanitizeText(description, 500);
+                const cleanCat = sanitizeText(category, 50);
+                const itemPrice = parseFloat(price);
+                if (isNaN(itemPrice) || itemPrice <= 0) throw new Error('Menu item price must be greater than zero');
+
                 // Check if user owns this cafe
                 const ownsCafe = await checkUserOwnsCafe(user.id, cafe_id);
                 if (user.role !== 'admin' && !ownsCafe) {
@@ -1963,12 +2028,12 @@ const resolvers = {
                     `INSERT INTO menu_items (cafe_id, name, description, price, category, preparation_time, image_url, status) 
                      VALUES ($1, $2, $3, $4, $5, $6, $7, 'Available') 
                      RETURNING id, name, description, price, category, status, image_url, created_at`,
-                    [cafe_id, name, description || null, price, category || null, preparation_time || null, image_url || null]
+                    [cafe_id, cleanName, cleanDesc, itemPrice, cleanCat, preparation_time || null, image_url || null]
                 );
                 
                 return result.rows[0];
             } catch (error) {
-                console.error('Create menu item error:', error);
+                console.error('Create menu item error:', error.message);
                 throw new Error(error.message || 'Failed to create menu item');
             }
         },
@@ -1997,10 +2062,26 @@ const resolvers = {
                 const values = [];
                 let paramCount = 1;
                 
-                if (name !== undefined) { updates.push(`name = $${paramCount++}`); values.push(name); }
-                if (description !== undefined) { updates.push(`description = $${paramCount++}`); values.push(description); }
-                if (price !== undefined) { updates.push(`price = $${paramCount++}`); values.push(price); }
-                if (category !== undefined) { updates.push(`category = $${paramCount++}`); values.push(category); }
+                if (name !== undefined) { 
+                    const cleanName = sanitizeText(name, 100);
+                    if (!cleanName) throw new Error('Name cannot be empty');
+                    updates.push(`name = $${paramCount++}`); 
+                    values.push(cleanName); 
+                }
+                if (description !== undefined) { 
+                    updates.push(`description = $${paramCount++}`); 
+                    values.push(sanitizeText(description, 500)); 
+                }
+                if (price !== undefined) { 
+                    const itemPrice = parseFloat(price);
+                    if (isNaN(itemPrice) || itemPrice <= 0) throw new Error('Price must be greater than zero');
+                    updates.push(`price = $${paramCount++}`); 
+                    values.push(itemPrice); 
+                }
+                if (category !== undefined) { 
+                    updates.push(`category = $${paramCount++}`); 
+                    values.push(sanitizeText(category, 50)); 
+                }
                 if (status !== undefined) { updates.push(`status = $${paramCount++}`); values.push(status); }
                 if (preparation_time !== undefined) { updates.push(`preparation_time = $${paramCount++}`); values.push(preparation_time); }
                 if (image_url !== undefined) { updates.push(`image_url = $${paramCount++}`); values.push(image_url); }
