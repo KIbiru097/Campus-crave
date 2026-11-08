@@ -121,7 +121,25 @@ app.post('/api/payment/initiate', express.json(), async (req, res) => {
             });
         }
         
+        const pool = require('./src/config/database');
+        const orderCheck = await pool.query(
+            "SELECT id, order_status FROM orders WHERE id = $1 AND deleted_at IS NULL",
+            [orderId]
+        );
+        if (orderCheck.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Order not found' });
+        }
+        if (orderCheck.rows[0].order_status !== 'PENDING') {
+            return res.status(400).json({ success: false, error: 'Order is not in pending status' });
+        }
+
         const txRef = MockPaymentService.generateTxRef(orderId);
+
+        // Bind initiated transaction reference to payment record
+        await pool.query(
+            "UPDATE payments SET transaction_id = $1 WHERE order_id = $2 AND payment_status = 'Pending'",
+            [txRef, orderId]
+        );
         
         const result = await MockPaymentService.initializePayment({
             amount, 
@@ -143,27 +161,48 @@ app.post('/api/payment/initiate', express.json(), async (req, res) => {
 app.get('/api/payment/verify/:txRef', async (req, res) => {
     try {
         const { txRef } = req.params;
+
+        // 1. Cryptographic HMAC validation
+        if (!MockPaymentService.verifySignature(txRef)) {
+            console.warn(`🚨 [SECURITY - FORGED PAYMENT] Attempted verify with invalid signature: ${txRef}`);
+            return res.status(400).json({ success: false, error: 'Invalid or forged transaction reference' });
+        }
+
+        const match = txRef.match(/^MOCK-(\d+)-/);
+        if (!match || !match[1]) {
+            return res.status(400).json({ success: false, error: 'Malformed transaction reference' });
+        }
+        const orderId = parseInt(match[1], 10);
+
+        const pool = require('./src/config/database');
+
+        // 2. Database validation: ensure txRef was legitimately initiated and not replayed
+        const paymentCheck = await pool.query(
+            "SELECT id, payment_status FROM payments WHERE transaction_id = $1 AND order_id = $2",
+            [txRef, orderId]
+        );
+
+        if (paymentCheck.rows.length === 0) {
+            console.warn(`🚨 [SECURITY - UNINITIATED PAYMENT] Attempted verify on uninitiated txRef: ${txRef}`);
+            return res.status(404).json({ success: false, error: 'Transaction reference not found or uninitiated' });
+        }
+
+        if (paymentCheck.rows[0].payment_status === 'Completed') {
+            return res.json({ success: true, message: 'Payment already completed for this order' });
+        }
+
         const result = await MockPaymentService.verifyPayment(txRef);
         
         if (result && result.success) {
-            const match = txRef.match(/^MOCK-(\d+)-/);
-            if (match && match[1]) {
-                const orderId = parseInt(match[1], 10);
-                try {
-                    const pool = require('./src/config/database');
-                    await pool.query(
-                        "UPDATE orders SET order_status = 'CONFIRMED', updated_at = NOW() WHERE id = $1 AND order_status = 'PENDING'",
-                        [orderId]
-                    );
-                    await pool.query(
-                        "UPDATE payments SET payment_status = 'Completed', transaction_id = $1, processed_at = NOW() WHERE order_id = $2",
-                        [txRef, orderId]
-                    );
-                    console.log(`✅ Order #${orderId} confirmed and payment marked Completed for tx ${txRef}`);
-                } catch (dbErr) {
-                    console.error('Error updating order/payment state on verify:', dbErr);
-                }
-            }
+            await pool.query(
+                "UPDATE orders SET order_status = 'CONFIRMED', updated_at = NOW() WHERE id = $1 AND order_status = 'PENDING'",
+                [orderId]
+            );
+            await pool.query(
+                "UPDATE payments SET payment_status = 'Completed', processed_at = NOW() WHERE transaction_id = $1",
+                [txRef]
+            );
+            console.log(`✅ Order #${orderId} confirmed and payment marked Completed for tx ${txRef}`);
         }
 
         res.json(result);

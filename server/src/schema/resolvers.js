@@ -361,7 +361,14 @@ const resolvers = {
                 if (result.rows.length === 0) throw new Error('Order not found');
 
                 const order = result.rows[0];
-                if (user.role !== 'admin' && user.role !== 'staff' && user.role !== 'owner') {
+                if (user.role === 'admin') {
+                    // Admin has global access
+                } else if (user.role === 'staff' || user.role === 'owner') {
+                    const ownsCafe = await checkUserOwnsCafe(user.id, order.cafe_id);
+                    if (!ownsCafe) {
+                        throw new Error('Not authorized to view this order');
+                    }
+                } else {
                     const studentResult = await pool.query(
                         'SELECT id FROM students WHERE user_id = $1',
                         [user.id]
@@ -567,6 +574,12 @@ const resolvers = {
                 const values = [];
                 
                 if (cafe_id) {
+                    if (user.role !== 'admin') {
+                        const ownsCafe = await checkUserOwnsCafe(user.id, cafe_id);
+                        if (!ownsCafe) {
+                            throw new Error('Not authorized to view orders for this cafe');
+                        }
+                    }
                     values.push(cafe_id);
                     query += ` AND o.cafe_id = $${values.length}`;
                 } else if (user.role !== 'admin') {
@@ -1209,18 +1222,56 @@ const resolvers = {
     Mutation: {
         // Auth Mutations
         register: async (_, { input }) => {
+            // 1. Strict input validation to prevent buffer/length overflows and malformed inputs
+            const validateField = (val, min, max, fieldName, required = true) => {
+                if (!val || typeof val !== 'string') {
+                    if (required) throw new Error(`${fieldName} is required`);
+                    return;
+                }
+                const trimmed = val.trim();
+                if (required && trimmed.length < min) {
+                    throw new Error(`${fieldName} must be at least ${min} characters`);
+                }
+                if (trimmed.length > max) {
+                    throw new Error(`${fieldName} must not exceed ${max} characters`);
+                }
+            };
+
+            validateField(input.username, 3, 50, 'Username');
+            validateField(input.email, 5, 100, 'Email');
+            validateField(input.password, 6, 100, 'Password');
+            validateField(input.full_name, 2, 100, 'Full name');
+            validateField(input.phone, 5, 20, 'Phone number');
+            validateField(input.reg_no, 2, 50, 'Registration number');
+            validateField(input.institution, 2, 100, 'Institution');
+            if (input.department) {
+                validateField(input.department, 1, 100, 'Department', false);
+            }
+            if (input.year_of_study !== undefined && input.year_of_study !== null) {
+                const year = parseInt(input.year_of_study, 10);
+                if (isNaN(year) || year < 1 || year > 12) {
+                    throw new Error('Year of study must be a valid number between 1 and 12');
+                }
+            }
+
+            const cleanEmail = input.email.trim().toLowerCase();
+            const cleanUsername = input.username.trim();
+
+            const client = await pool.connect();
             try {
-                const existingEmail = await pool.query(
-                    'SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL',
-                    [input.email]
+                await client.query('BEGIN');
+
+                const existingEmail = await client.query(
+                    'SELECT id FROM users WHERE LOWER(email) = $1 AND deleted_at IS NULL',
+                    [cleanEmail]
                 );
                 if (existingEmail.rows.length > 0) {
                     throw new Error('Email already registered');
                 }
                 
-                const existingUsername = await pool.query(
-                    'SELECT * FROM users WHERE username = $1 AND deleted_at IS NULL',
-                    [input.username]
+                const existingUsername = await client.query(
+                    'SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL',
+                    [cleanUsername]
                 );
                 if (existingUsername.rows.length > 0) {
                     throw new Error('Username already taken');
@@ -1228,33 +1279,37 @@ const resolvers = {
                 
                 const hashedPassword = await bcrypt.hash(input.password, 10);
                 
-                const userResult = await pool.query(
+                const userResult = await client.query(
                     `INSERT INTO users (username, email, password_hash, phone, role) 
                      VALUES ($1, $2, $3, $4, 'student') 
                      RETURNING id, username, email, phone, role, created_at`,
-                    [input.username, input.email, hashedPassword, input.phone]
+                    [cleanUsername, cleanEmail, hashedPassword, input.phone.trim()]
                 );
                 
                 const user = userResult.rows[0];
                 
-                await pool.query(
+                await client.query(
                     `INSERT INTO students (user_id, full_name, reg_no, institution, department, year_of_study, phone_number, verification_status) 
                      VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending')`,
-                    [user.id, input.full_name, input.reg_no, input.institution, input.department, input.year_of_study || null, input.phone]
+                    [user.id, input.full_name.trim(), input.reg_no.trim(), input.institution.trim(), input.department ? input.department.trim() : null, input.year_of_study || null, input.phone.trim()]
                 );
                 
                 const token = generateToken(user);
                 const refreshToken = generateRefreshToken(user);
                 
-                await pool.query(
+                await client.query(
                     'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'30 days\')',
                     [user.id, refreshToken]
                 );
-                
+
+                await client.query('COMMIT');
                 return { token, refreshToken, user };
             } catch (error) {
-                console.error('Registration error:', error);
+                await client.query('ROLLBACK');
+                console.error('Registration error:', error.message);
                 throw new Error(error.message || 'Registration failed');
+            } finally {
+                client.release();
             }
         },
         
@@ -1632,6 +1687,20 @@ const resolvers = {
             }
             
             try {
+                // Verify order exists and cafe authorization
+                const orderCheck = await pool.query(
+                    'SELECT cafe_id FROM orders WHERE id = $1 AND deleted_at IS NULL',
+                    [input.order_id]
+                );
+                if (orderCheck.rows.length === 0) throw new Error('Order not found');
+
+                if (user.role !== 'admin') {
+                    const ownsCafe = await checkUserOwnsCafe(user.id, orderCheck.rows[0].cafe_id);
+                    if (!ownsCafe) {
+                        throw new Error('Not authorized to update orders for this cafe');
+                    }
+                }
+
                 const result = await pool.query(
                     `UPDATE orders 
                      SET order_status = $1, updated_at = CURRENT_TIMESTAMP
@@ -1648,7 +1717,7 @@ const resolvers = {
                 return order;
             } catch (error) {
                 console.error('Update order status error:', error);
-                throw new Error('Failed to update order status');
+                throw new Error(error.message || 'Failed to update order status');
             }
         },
         
@@ -1657,14 +1726,21 @@ const resolvers = {
             
             try {
                 const orderResult = await pool.query(
-                    'SELECT order_status, student_id FROM orders WHERE id = $1 AND deleted_at IS NULL',
+                    'SELECT order_status, student_id, cafe_id FROM orders WHERE id = $1 AND deleted_at IS NULL',
                     [order_id]
                 );
                 
                 if (orderResult.rows.length === 0) throw new Error('Order not found');
                 const orderData = orderResult.rows[0];
 
-                if (user.role !== 'admin' && user.role !== 'staff' && user.role !== 'owner') {
+                if (user.role === 'admin') {
+                    // Admin can cancel
+                } else if (user.role === 'staff' || user.role === 'owner') {
+                    const ownsCafe = await checkUserOwnsCafe(user.id, orderData.cafe_id);
+                    if (!ownsCafe) {
+                        throw new Error('Not authorized to cancel orders for this cafe');
+                    }
+                } else {
                     const studentResult = await pool.query(
                         'SELECT id FROM students WHERE user_id = $1',
                         [user.id]

@@ -1,8 +1,31 @@
 // src/services/mockPaymentService.js
+const crypto = require('crypto');
+
 class MockPaymentService {
-    // Generate transaction reference
+    // Generate secure transaction reference with HMAC signature
     static generateTxRef(orderId) {
-        return `MOCK-${orderId}-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        const timestamp = Date.now();
+        const secret = process.env.JWT_SECRET || 'campus_crave_secret_2024';
+        const signature = crypto.createHmac('sha256', secret)
+            .update(`${orderId}:${timestamp}`)
+            .digest('hex')
+            .slice(0, 16);
+        return `MOCK-${orderId}-${timestamp}-${signature}`;
+    }
+
+    // Verify HMAC signature of transaction reference
+    static verifySignature(txRef) {
+        if (!txRef || typeof txRef !== 'string') return false;
+        const parts = txRef.split('-');
+        if (parts.length !== 4 || parts[0] !== 'MOCK') return false;
+        const [_, orderId, timestamp, signature] = parts;
+        const secret = process.env.JWT_SECRET || 'campus_crave_secret_2024';
+        const expected = crypto.createHmac('sha256', secret)
+            .update(`${orderId}:${timestamp}`)
+            .digest('hex')
+            .slice(0, 16);
+        if (signature.length !== expected.length) return false;
+        return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
     }
 
     // Initialize mock payment
