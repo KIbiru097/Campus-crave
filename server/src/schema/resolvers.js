@@ -1086,10 +1086,28 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
+        // Bolt: Optimized with request-scoped caching to resolve N+1 query overhead.
+        // When fetching lists of orders (e.g. cafeOrders, myOrders, availableOrders),
+        // multiple orders share the same cafe. Caching the lookup Promise in context.reqCache
+        // deduplicates identical DB queries and collapses N queries down to 1 per unique cafe.
+        cafe: async (order, _, context) => {
+            if (!order.cafe_id) return null;
             try {
+                const cache = context?.reqCache;
+                const cacheKey = `cafe:${order.cafe_id}`;
+                if (cache) {
+                    if (cache.has(cacheKey)) {
+                        return await cache.get(cacheKey);
+                    }
+                    const queryPromise = (async () => {
+                        const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
+                        return result.rows[0] || null;
+                    })();
+                    cache.set(cacheKey, queryPromise);
+                    return await queryPromise;
+                }
                 const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
+                return result.rows[0] || null;
             } catch (error) {
                 return null;
             }
