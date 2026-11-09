@@ -1086,27 +1086,49 @@ const resolvers = {
     },
     
     Order: {
-        cafe: async (order) => {
-            try {
-                const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
-                return result.rows[0];
-            } catch (error) {
-                return null;
+        // ⚡ Performance optimization: Deduplicate Order.cafe queries across multiple orders in the same request
+        cafe: async (order, _, context) => {
+            const cacheKey = `cafe:${order.cafe_id}`;
+            if (context?.dataCache?.has(cacheKey)) {
+                return context.dataCache.get(cacheKey);
             }
+            const fetchPromise = (async () => {
+                try {
+                    const result = await pool.query('SELECT * FROM cafes WHERE id = $1 AND deleted_at IS NULL', [order.cafe_id]);
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.dataCache) {
+                context.dataCache.set(cacheKey, fetchPromise);
+            }
+            return fetchPromise;
         },
-        student: async (order) => {
-            try {
-                const result = await pool.query(
-                    `SELECT s.*, u.username, u.email
-                     FROM students s
-                     JOIN users u ON s.user_id = u.id
-                     WHERE s.id = $1 AND u.deleted_at IS NULL`,
-                    [order.student_id]
-                );
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
+        // ⚡ Performance optimization: Deduplicate Order.student queries across multiple orders in the same request
+        student: async (order, _, context) => {
+            const cacheKey = `student:${order.student_id}`;
+            if (context?.dataCache?.has(cacheKey)) {
+                return context.dataCache.get(cacheKey);
             }
+            const fetchPromise = (async () => {
+                try {
+                    const result = await pool.query(
+                        `SELECT s.*, u.username, u.email
+                         FROM students s
+                         JOIN users u ON s.user_id = u.id
+                         WHERE s.id = $1 AND u.deleted_at IS NULL`,
+                        [order.student_id]
+                    );
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.dataCache) {
+                context.dataCache.set(cacheKey, fetchPromise);
+            }
+            return fetchPromise;
         },
         items: async (order) => {
             try {
@@ -1155,27 +1177,49 @@ const resolvers = {
                 return null;
             }
         },
-        delivery_person: async (delivery) => {
-            try {
-                const result = await pool.query(
-                    'SELECT id, username, email, phone, role FROM users WHERE id = $1',
-                    [delivery.delivery_person_id]
-                );
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
+        // ⚡ Performance optimization: Deduplicate Delivery.delivery_person across deliveries in the same request
+        delivery_person: async (delivery, _, context) => {
+            const cacheKey = `user:${delivery.delivery_person_id}`;
+            if (context?.dataCache?.has(cacheKey)) {
+                return context.dataCache.get(cacheKey);
             }
+            const fetchPromise = (async () => {
+                try {
+                    const result = await pool.query(
+                        'SELECT id, username, email, phone, role FROM users WHERE id = $1',
+                        [delivery.delivery_person_id]
+                    );
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.dataCache) {
+                context.dataCache.set(cacheKey, fetchPromise);
+            }
+            return fetchPromise;
         },
-        assigner: async (delivery) => {
-            try {
-                const result = await pool.query(
-                    'SELECT id, username, email, phone, role FROM users WHERE id = $1',
-                    [delivery.assigned_by]
-                );
-                return result.rows[0] || null;
-            } catch (error) {
-                return null;
+        // ⚡ Performance optimization: Deduplicate Delivery.assigner across deliveries in the same request
+        assigner: async (delivery, _, context) => {
+            const cacheKey = `user:${delivery.assigned_by}`;
+            if (context?.dataCache?.has(cacheKey)) {
+                return context.dataCache.get(cacheKey);
             }
+            const fetchPromise = (async () => {
+                try {
+                    const result = await pool.query(
+                        'SELECT id, username, email, phone, role FROM users WHERE id = $1',
+                        [delivery.assigned_by]
+                    );
+                    return result.rows[0] || null;
+                } catch (error) {
+                    return null;
+                }
+            })();
+            if (context?.dataCache) {
+                context.dataCache.set(cacheKey, fetchPromise);
+            }
+            return fetchPromise;
         },
     },
 

@@ -1,0 +1,3 @@
+## 2026-03-30 - GraphQL Request-Scoped Caching for Nested Resolvers
+**Learning:** In GraphQL schemas with parent-child relationships (e.g. `Order.cafe`, `Order.student`, `Delivery.delivery_person`), fetching list queries like `cafeOrders` or `myOrders` produces classic N+1 database queries. Because full DataLoader setups require external libraries or batch-query rewrites, a request-scoped `Map` in Apollo Server context storing in-flight Promises provides instant deduplication of concurrent duplicate queries with zero external dependencies and zero risk of cross-request cache leaks.
+**Action:** When optimizing GraphQL field resolvers, instantiate a fresh `Map` in `context` per request and wrap child resolution promises with key-based lookup.
