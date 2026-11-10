@@ -114,6 +114,7 @@ export default function QRMenuPage() {
 
   const clearItem = useCallback(id => setCart(p => p.filter(x => x.id !== id)), []);
   const toggleFav = useCallback(id => setFavs(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; }), []);
+  const selectItem = useCallback(item => setSelected(item), []);
 
   return (
     <div className="qr-root">
@@ -154,7 +155,7 @@ export default function QRMenuPage() {
                   </div>
                   <div className="qr-grid">
                     {items.map((item, i) => (
-                      <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} favorites={favs} onToggleFav={toggleFav} />
+                      <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={selectItem} isFav={favs.has(item.id)} onToggleFav={toggleFav} />
                     ))}
                   </div>
                 </section>
@@ -164,7 +165,7 @@ export default function QRMenuPage() {
             <section className="qr-section" style={{ paddingTop: 28 }}>
               <div className="qr-grid">
                 {shown.map((item, i) => (
-                  <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={setSelected} favorites={favs} onToggleFav={toggleFav} />
+                  <MenuItemCard key={item.id} item={item} index={i} cartQty={cartQty(item.id)} onAdd={addCart} onRemove={removeCart} onDetail={selectItem} isFav={favs.has(item.id)} onToggleFav={toggleFav} />
                 ))}
               </div>
             </section>
