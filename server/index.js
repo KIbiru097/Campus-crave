@@ -266,7 +266,9 @@ async function startServer() {
             context: async ({ req }) => {
                 const token = req.headers.authorization || '';
                 const user = await getUserFromToken(token);
-                return { user, req };
+                // ⚡ Performance optimization: Request-scoped cache (Map) to eliminate N+1 database queries
+                // across concurrent field resolvers (Order.cafe, Order.student, Delivery.delivery_person, etc.)
+                return { user, req, dataCache: new Map() };
             },
         })
     );
